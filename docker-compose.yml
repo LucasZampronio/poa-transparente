@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: poa-postgres
+    environment:
+      POSTGRES_DB: poa_transparente
+      POSTGRES_USER: poa
+      POSTGRES_PASSWORD: poa
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/init:/docker-entrypoint-initdb.d
+
+  etl:
+    build:
+      context: ./etl
+    container_name: poa-etl
+    environment:
+      DATABASE_URL: postgresql://poa:poa@postgres:5432/poa_transparente
+    depends_on:
+      - postgres
+
+  api:
+    build:
+      context: ./api
+    container_name: poa-api
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://poa:poa@postgres:5432/poa_transparente
+    ports:
+      - "4000:4000"
+    depends_on:
+      - postgres
+      - etl
+
+  web:
+    build:
+      context: ./web
+    container_name: poa-web
+    environment:
+      VITE_API_URL: http://localhost:4000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: poa-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - api
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: poa-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
