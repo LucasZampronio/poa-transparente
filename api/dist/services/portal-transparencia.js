@@ -43,7 +43,7 @@ export async function syncBolsaFamilia(mesAno, codigoIbge) {
     let data = [];
     try {
         // A API do Portal usa paginação. Assumindo página 1 para começar.
-        data = await portalGet('/bolsa-familia-por-municipio', {
+        data = await portalGet('/novo-bolsa-familia-por-municipio', {
             mesAno,
             codigoIbge,
             pagina: 1
@@ -121,7 +121,14 @@ export async function syncBolsaFamilia(mesAno, codigoIbge) {
     return { syncedRecords: data.length };
 }
 export async function getBolsaFamiliaFromDb(mesAno, codigoIbge) {
-    const result = await pool.query(`SELECT * FROM portal_beneficios_municipio 
+    const result = await pool.query(`SELECT 
+        id, 
+        mes_ano, 
+        municipio_codigo_ibge as codigo_ibge, 
+        municipio_nome as nome_municipio, 
+        valor as valor_transferido, 
+        quantidade_beneficiados as quantidade_beneficiarios
+     FROM portal_beneficios_municipio 
      WHERE dataset_key = 'bolsa-familia-por-municipio' 
        AND mes_ano = $1 
        AND municipio_codigo_ibge = $2`, [mesAno, codigoIbge]);

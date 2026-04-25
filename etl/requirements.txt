@@ -1,3 +1,4 @@
-psycopg2-binary
 pandas
 requests
+psycopg2-binary
+geopy

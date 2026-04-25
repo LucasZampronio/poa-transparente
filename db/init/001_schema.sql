@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS public_expenses (
   agency VARCHAR(150) NOT NULL,
   company_name VARCHAR(180) NOT NULL,
   category VARCHAR(120) NOT NULL,
+  sector VARCHAR(100),
   district VARCHAR(120) NOT NULL,
   latitude NUMERIC(9,6) NOT NULL,
   longitude NUMERIC(9,6) NOT NULL,
