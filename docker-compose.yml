@@ -27,6 +27,7 @@ services:
     environment:
       PORT: 4000
       DATABASE_URL: postgresql://poa:poa@postgres:5432/poa_transparente
+      PORTAL_TRANSPARENCIA_API_KEY: "04bfc25fbd6241b8adeb4b553d56e219"
     ports:
       - "4000:4000"
     depends_on:

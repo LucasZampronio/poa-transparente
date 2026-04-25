@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "poa-helper": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\lucas\\Desktop\\poa-transparente\\mcp\\dist\\index.js"
+      ],
+      "trust": true
+    }
+  }
+}

@@ -16,26 +16,26 @@ AGENCIES = [
 ]
 
 CATEGORIES = [
-    "Saúde",
-    "Educação",
+    "Saude",
+    "Educacao",
     "Infraestrutura",
     "Mobilidade",
-    "Assistência Social",
+    "Assistencia Social",
 ]
 
 COMPANIES = [
     "Construtora Sul",
-    "Porto Verde Serviços",
+    "Porto Verde Servicos",
     "Mapa Urbano Tech",
     "Hospitalar RS",
-    "Leste Logística",
+    "Leste Logistica",
     "Dados Abertos Brasil",
 ]
 
 POINTS = [
-    ("Centro Histórico", -30.0277, -51.2287),
+    ("Centro Historico", -30.0277, -51.2287),
     ("Restinga", -30.1401, -51.1353),
-    ("Mário Quintana", -30.0337, -51.0802),
+    ("Mario Quintana", -30.0337, -51.0802),
     ("Partenon", -30.0550, -51.1801),
     ("Sarandi", -29.9970, -51.1182),
     ("Cristal", -30.0822, -51.2354),
