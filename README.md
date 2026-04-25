@@ -14,9 +14,9 @@ Este projeto foi montado para simular um cenário real de produto:
 
 ## Arquitetura
 
-- Python (`etl/`): geração/carga de dados sintéticos no banco
-- PostgreSQL (`db/init/`): schema e persistência principal
-- Node.js + TypeScript (`api/`): endpoints e métricas
+- Python (`etl/`): Sincronização inteligente via API CKAN (DadosAbertos.Poa)
+- PostgreSQL (`db/init/`): Schema analítico e persistência
+- Node.js + TypeScript (`api/`): API REST com integração ao Portal da Transparência Federal (Bolsa Família)
 - React + Vite + Leaflet (`web/`): dashboard web e mapa
 - Prometheus (`monitoring/prometheus/`): scraping de métricas
 - Grafana (`monitoring/grafana/`): dashboards provisionados
@@ -170,4 +170,4 @@ Parar e remover volumes:
 
 ## Nota
 
-Os dados atuais são sintéticos para estudo e validação técnica da arquitetura.
+Este projeto utiliza exclusivamente dados oficiais extraídos via API do Portal de Dados Abertos de Porto Alegre (SDO 2023-2026) e do Portal da Transparência do Governo Federal (Novo Bolsa Família), garantindo uma análise fiel e auditável da gestão pública.

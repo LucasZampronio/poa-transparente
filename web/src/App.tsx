@@ -1,16 +1,20 @@
-import 'leaflet/dist/leaflet.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import CategorySuitePanel from './components/CategorySuitePanel';
+import Footer from './components/Footer';
+import Header from './components/Header';
 import MapPanel from './components/MapPanel';
 import RankingPanel from './components/RankingPanel';
 import TimeseriesPanel from './components/TimeseriesPanel';
 import {
+  BolsaFamiliaData,
   CategorySuite,
+  fetchBolsaFamilia,
   fetchCategorySuite,
   fetchJson,
   fetchMapCategories,
   fetchMapPoints,
+  formatCurrency,
   MapCategory,
   MapPoint,
   RankingRow,
@@ -20,6 +24,7 @@ import {
 
 export default function App() {
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [bolsaFamilia, setBolsaFamilia] = useState<BolsaFamiliaData | null>(null);
   const [categorySuite, setCategorySuite] = useState<CategorySuite | null>(null);
   const [mapPoints, setMapPoints] = useState<MapPoint[]>([]);
   const [mapCategories, setMapCategories] = useState<MapCategory[]>([]);
@@ -38,37 +43,38 @@ export default function App() {
 
   useEffect(() => {
     let ignore = false;
-
     async function load() {
       try {
-        const [summaryData, categoriesData, mapData, companiesData, agenciesData, timeseriesData] =
-          await Promise.all([
-            fetchJson<Summary>('/api/summary'),
-            fetchMapCategories(),
-            fetchMapPoints(),
-            fetchJson<RankingRow[]>('/api/rankings/companies'),
-            fetchJson<RankingRow[]>('/api/rankings/agencies'),
-            fetchJson<TimeseriesRow[]>('/api/timeseries'),
-          ]);
+        const [
+          summaryData,
+          categoriesData,
+          mapData,
+          companiesData,
+          agenciesData,
+          timeseriesData,
+          bolsaData,
+        ] = await Promise.all([
+          fetchJson<Summary>('/api/summary'),
+          fetchMapCategories(),
+          fetchMapPoints(),
+          fetchJson<RankingRow[]>('/api/rankings/companies'),
+          fetchJson<RankingRow[]>('/api/rankings/agencies'),
+          fetchJson<TimeseriesRow[]>('/api/timeseries'),
+          fetchBolsaFamilia('202401'),
+        ]);
 
-        if (ignore) {
-          return;
-        }
+        if (ignore) return;
 
         setSummary(summaryData);
-        setMapCategories(categoriesData);
-        setMapPoints(mapData);
-        setCompanies(companiesData);
-        setAgencies(agenciesData);
-        setTimeseries(timeseriesData);
-        setMapError(null);
+        setBolsaFamilia(bolsaData);
+        setMapCategories(categoriesData || []);
+        setMapPoints(mapData || []);
+        setCompanies(companiesData || []);
+        setAgencies(agenciesData || []);
+        setTimeseries(timeseriesData || []);
         hasLoadedInitialMap.current = true;
       } catch (e) {
-        if (!ignore) {
-          const message = (e as Error).message;
-          setError(message);
-          setMapError(message);
-        }
+        if (!ignore) setError((e as Error).message);
       } finally {
         if (!ignore) {
           setLoading(false);
@@ -76,168 +82,107 @@ export default function App() {
         }
       }
     }
-
     load();
-
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, []);
 
   useEffect(() => {
-    if (!hasLoadedInitialMap.current) {
-      return;
-    }
-
+    if (!hasLoadedInitialMap.current) return;
     let ignore = false;
-
     async function loadFilteredMap() {
       setMapLoading(true);
       setMapError(null);
-
       try {
         const data = await fetchMapPoints(selectedCategories);
-
-        if (!ignore) {
-          setMapPoints(data);
-        }
+        if (!ignore) setMapPoints(data);
       } catch (e) {
-        if (!ignore) {
-          setMapError((e as Error).message);
-        }
+        if (!ignore) setMapError((e as Error).message);
       } finally {
-        if (!ignore) {
-          setMapLoading(false);
-        }
+        if (!ignore) setMapLoading(false);
       }
     }
-
     loadFilteredMap();
-
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, [selectedCategories]);
-
-  useEffect(() => {
-    if (!focusedCategory) {
-      setCategorySuite(null);
-      setSuiteError(null);
-      setSuiteLoading(false);
-      return;
-    }
-
-    const category = focusedCategory;
-    let ignore = false;
-
-    async function loadCategorySuite() {
-      setSuiteLoading(true);
-      setSuiteError(null);
-      setCategorySuite(null);
-
-      try {
-        const data = await fetchCategorySuite(category);
-
-        if (!ignore) {
-          setCategorySuite(data);
-        }
-      } catch (e) {
-        if (!ignore) {
-          setSuiteError((e as Error).message);
-        }
-      } finally {
-        if (!ignore) {
-          setSuiteLoading(false);
-        }
-      }
-    }
-
-    loadCategorySuite();
-
-    return () => {
-      ignore = true;
-    };
-  }, [focusedCategory]);
 
   const cards = useMemo(() => {
     if (!summary) return [];
-
     return [
-      { label: 'Total gasto', value: `R$ ${Number(summary.total_spent).toLocaleString('pt-BR')}` },
-      { label: 'Contratos', value: Number(summary.contracts_count).toLocaleString('pt-BR') },
-      { label: 'Empresas', value: Number(summary.companies_count).toLocaleString('pt-BR') },
-      { label: 'Orgaos', value: Number(summary.agencies_count).toLocaleString('pt-BR') },
+      { label: 'Total Gasto', value: formatCurrency(summary.total_spent), color: 'text-blue-600' },
+      { label: 'Contratos Ativos', value: Number(summary.contracts_count).toLocaleString('pt-BR'), color: 'text-slate-900' },
+      { label: 'Empresas Fornecedoras', value: Number(summary.companies_count).toLocaleString('pt-BR'), color: 'text-slate-900' },
+      { label: 'Bolsa Familia (JAN/24)', value: bolsaFamilia ? formatCurrency(bolsaFamilia.valor_transferido) : 'N/A', color: 'text-emerald-600' },
     ];
-  }, [summary]);
-
-  function handleToggleCategory(category: string) {
-    setSelectedCategories((current) =>
-      current.includes(category)
-        ? current.filter((item) => item !== category)
-        : [...current, category]
-    );
-  }
-
-  function handleClearCategories() {
-    setSelectedCategories([]);
-  }
+  }, [summary, bolsaFamilia]);
 
   return (
-    <main className="layout">
-      <header className="header">
-        <h1>POA Transparente</h1>
-        <p>Visualizacao de gastos publicos com foco em transparencia e observabilidade.</p>
-      </header>
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 flex flex-col">
+      <Header />
+      
+      <main className="flex-1 max-w-7xl mx-auto px-4 w-full pb-12 space-y-6">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 animate-pulse">
+            <div className="w-12 h-12 bg-blue-200 rounded-full mb-4"></div>
+            <p className="text-slate-500 font-medium">Sincronizando dados orcamentarios...</p>
+          </div>
+        ) : error ? (
+          <div className="p-6 bg-red-50 border border-red-200 rounded-xl text-red-700">
+            <h3 className="font-bold">Falha na conexao</h3>
+            <p className="text-sm opacity-90">{error}</p>
+          </div>
+        ) : (
+          <>
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {cards.map((card) => (
+                <div key={card.label} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">{card.label}</span>
+                  <strong className={`text-xl md:text-2xl font-black ${card.color}`}>{card.value}</strong>
+                </div>
+              ))}
+            </div>
 
-      {loading && <div className="panel">Carregando dados...</div>}
-      {error && <div className="panel error">{error}</div>}
+            {/* Main Content Area */}
+            <div className="space-y-6">
+              <MapPanel
+                points={mapPoints}
+                categories={mapCategories}
+                selectedCategories={selectedCategories}
+                loading={mapLoading}
+                error={mapError}
+                onToggleCategory={(c) => setSelectedCategories(prev => prev.includes(c) ? [] : [c])}
+                onClearCategories={() => setSelectedCategories([])}
+              />
 
-      {!loading && !error && (
-        <>
-          <section className="cards-grid">
-            {cards.map((card) => (
-              <article className="card" key={card.label}>
-                <span>{card.label}</span>
-                <strong>{card.value}</strong>
-              </article>
-            ))}
-          </section>
+              <CategorySuitePanel
+                suite={categorySuite}
+                selectedCategories={selectedCategories}
+                loading={suiteLoading}
+                error={suiteError}
+              />
 
-          <MapPanel
-            points={mapPoints}
-            categories={mapCategories}
-            selectedCategories={selectedCategories}
-            loading={mapLoading}
-            error={mapError}
-            onToggleCategory={handleToggleCategory}
-            onClearCategories={handleClearCategories}
-          />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <RankingPanel
+                  title="Ranking de Empresas"
+                  rows={companies}
+                  labelKey="company_name"
+                  valueKey="total_received"
+                />
+                <RankingPanel
+                  title="Ranking de Orgaos"
+                  rows={agencies}
+                  labelKey="agency"
+                  valueKey="total_spent"
+                />
+              </div>
 
-          <CategorySuitePanel
-            suite={categorySuite}
-            selectedCategories={selectedCategories}
-            loading={suiteLoading}
-            error={suiteError}
-          />
-
-          <section className="two-col">
-            <RankingPanel
-              title="Ranking de Empresas"
-              rows={companies}
-              labelKey="company_name"
-              valueKey="total_received"
-            />
-            <RankingPanel
-              title="Ranking de Orgaos"
-              rows={agencies}
-              labelKey="agency"
-              valueKey="total_spent"
-            />
-          </section>
-
-          <TimeseriesPanel rows={timeseries} />
-        </>
-      )}
-    </main>
+              <TimeseriesPanel rows={timeseries} />
+            </div>
+          </>
+        )}
+      </main>
+      
+      <Footer />
+    </div>
   );
 }

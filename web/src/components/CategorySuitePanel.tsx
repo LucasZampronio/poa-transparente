@@ -1,7 +1,9 @@
+import { cn } from '../lib/utils';
 import {
   type AccessLevel,
   type CategorySuite,
   formatCategoryLabel,
+  formatCurrency,
   type SuiteIndicator,
 } from '../lib/api';
 
@@ -20,289 +22,117 @@ const accessLabels: Record<AccessLevel, string> = {
   'municipal-system': 'Sistema municipal',
 };
 
-function formatCompactCurrency(value: number) {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    maximumFractionDigits: value >= 1000000 ? 1 : 0,
-    notation: value >= 1000000 ? 'compact' : 'standard',
-  }).format(value);
-}
-
 function formatIndicatorValue(indicator: SuiteIndicator) {
-  if (indicator.value === null || indicator.value === '') {
-    return 'Em integracao';
-  }
-
-  if (typeof indicator.value === 'string') {
-    return indicator.value;
-  }
+  if (indicator.value === null || indicator.value === '') return 'Em integracao';
+  if (typeof indicator.value === 'string') return indicator.value;
 
   switch (indicator.unit) {
-    case 'BRL':
-      return `R$ ${indicator.value.toLocaleString('pt-BR', {
-        minimumFractionDigits: indicator.value < 1000 ? 2 : 0,
-        maximumFractionDigits: 2,
-      })}`;
+    case 'BRL': return formatCurrency(indicator.value);
     case 'count':
-    case 'people':
-      return indicator.value.toLocaleString('pt-BR');
-    case 'percent':
-      return `${indicator.value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
-    case 'per-1000':
-      return `${indicator.value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} / 1.000`;
-    case 'density':
-      return `${indicator.value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} hab/km2`;
-    case 'days':
-      return `${indicator.value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} dias`;
-    case 'minutes':
-      return `${indicator.value.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} min`;
-    default:
-      return indicator.value.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+    case 'people': return indicator.value.toLocaleString('pt-BR');
+    case 'percent': return `${indicator.value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
+    default: return indicator.value.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
   }
 }
 
-export default function CategorySuitePanel({
-  suite,
-  selectedCategories,
-  loading,
-  error,
-}: Props) {
+export default function CategorySuitePanel({ suite, selectedCategories, loading, error }: Props) {
   if (selectedCategories.length === 0) {
     return (
-      <section className="panel suite-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Suite setorial por municipio</h2>
-            <p className="panel-copy">
-              Selecione um setor no mapa para abrir os indicadores municipais daquela agenda.
-            </p>
-          </div>
-        </div>
-        <div className="suite-empty">
-          A suite cruza investimento monitorado com indicadores-base da cidade, fontes oficiais e
-          leitura territorial do setor.
-        </div>
+      <section className="bg-white rounded-xl border-2 border-dashed border-slate-200 p-12 text-center">
+        <h2 className="text-xl font-bold text-slate-800">Suite Setorial</h2>
+        <p className="text-slate-500 mt-2">Selecione um setor no mapa para abrir indicadores detalhados.</p>
       </section>
     );
   }
 
   if (selectedCategories.length > 1) {
     return (
-      <section className="panel suite-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Suite setorial por municipio</h2>
-            <p className="panel-copy">
-              O mapa aceita varios filtros, mas a leitura detalhada exige um setor em foco.
-            </p>
-          </div>
-        </div>
-        <div className="suite-empty">
-          Setores selecionados: {selectedCategories.map(formatCategoryLabel).join(', ')}. Mantenha
-          apenas um setor para abrir os indicadores especificos.
-        </div>
+      <section className="bg-blue-50 rounded-xl border border-blue-100 p-12 text-center">
+        <h2 className="text-xl font-bold text-blue-900">Múltiplos Setores Selecionados</h2>
+        <p className="text-blue-700 mt-2">Selecione apenas um setor para ver a análise profunda.</p>
       </section>
     );
   }
 
   if (loading) {
     return (
-      <section className="panel suite-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Suite setorial por municipio</h2>
-            <p className="panel-copy">Carregando indicadores e fontes oficiais do setor.</p>
-          </div>
-        </div>
+      <section className="bg-white rounded-xl border border-slate-200 p-12 text-center animate-pulse">
+        <div className="h-4 w-32 bg-slate-100 mx-auto rounded mb-4" />
+        <div className="h-8 w-64 bg-slate-100 mx-auto rounded" />
       </section>
     );
   }
 
-  if (error) {
-    return (
-      <section className="panel suite-panel">
-        <div className="panel-heading">
-          <div>
-            <h2>Suite setorial por municipio</h2>
-            <p className="panel-copy">Falha ao montar a leitura detalhada do setor.</p>
-          </div>
-        </div>
-        <div className="suite-empty error">{error}</div>
-      </section>
-    );
-  }
-
-  if (!suite) {
-    return null;
-  }
+  if (!suite) return null;
 
   const sourceMap = new Map(suite.sources.map((source) => [source.key ?? source.id, source]));
-  const availability = Object.entries(suite.availabilitySummary).filter(([, count]) => count > 0);
-  const maxMonthValue = Math.max(...suite.monthlySeries.map((row) => row.totalSpent), 1);
-  const overviewCards = [
-    { label: 'Investimento monitorado', value: formatCompactCurrency(suite.overview.totalSpent) },
-    { label: 'Contratos', value: suite.overview.contractsCount.toLocaleString('pt-BR') },
-    { label: 'Empresas', value: suite.overview.companiesCount.toLocaleString('pt-BR') },
-    { label: 'Bairros', value: suite.overview.districtsCount.toLocaleString('pt-BR') },
-    { label: 'Licitações monitoradas', value: suite.overview.biddingVolume.toLocaleString('pt-BR') },
-    {
-      label: 'Principal orgao',
-      value: suite.overview.topAgency
-        ? `${suite.overview.topAgency} · ${formatCompactCurrency(suite.overview.topAgencySpent)}`
-        : 'Sem destaque',
-    },
-  ];
 
   return (
-    <section className="panel suite-panel">
-      <div className="panel-heading">
-        <div>
-          <h2>Suite setorial: {suite.category.label}</h2>
-          <p className="panel-copy">{suite.category.summary}</p>
-        </div>
-        <div className="map-kpi">
-          <strong>{suite.indicatorGroups.length}</strong>
-          <span>blocos analiticos</span>
-        </div>
-      </div>
-
-      <div className="suite-intro">
-        <strong>
-          {suite.municipality.name} ({suite.municipality.uf})
-        </strong>
-        <span>{suite.category.rationale}</span>
-        <small>{suite.municipality.scope}</small>
-      </div>
-
-      <div className="suite-overview-grid">
-        {overviewCards.map((card) => (
-          <article className="suite-card" key={card.label}>
-            <span>{card.label}</span>
-            <strong>{card.value}</strong>
-          </article>
-        ))}
-      </div>
-
-      <div className="suite-availability">
-        {availability.map(([key, count]) => (
-          <span key={key} className={`suite-badge is-${key}`}>
-            {accessLabels[key as AccessLevel]}: {count}
-          </span>
-        ))}
-      </div>
-
-      <div className="suite-split">
-        <article className="suite-subpanel">
-          <h3>Distribuicao territorial</h3>
-          <ul className="suite-list">
-            {suite.territorialBreakdown.map((row) => (
-              <li key={row.district}>
-                <div>
-                  <strong>{row.district}</strong>
-                  <small>{row.contractsCount.toLocaleString('pt-BR')} contratos</small>
-                </div>
-                <span>{formatCompactCurrency(row.totalSpent)}</span>
-              </li>
-            ))}
-          </ul>
-        </article>
-
-        <article className="suite-subpanel">
-          <h3>Empresas com maior volume</h3>
-          <ul className="suite-list">
-            {suite.topCompanies.map((row) => (
-              <li key={row.companyName}>
-                <div>
-                  <strong>{row.companyName}</strong>
-                  <small>Fornecedor monitorado</small>
-                </div>
-                <span>{formatCompactCurrency(row.totalReceived)}</span>
-              </li>
-            ))}
-          </ul>
-        </article>
-
-        <article className="suite-subpanel">
-          <h3>Evolucao setorial</h3>
-          <div className="suite-months">
-            {suite.monthlySeries.map((row) => (
-              <div key={row.month} className="suite-month-row">
-                <span>{row.month}</span>
-                <div className="suite-month-bar">
-                  <div
-                    className="suite-month-fill"
-                    style={{ width: `${(row.totalSpent / maxMonthValue) * 100}%` }}
-                  />
-                </div>
-                <strong>{formatCompactCurrency(row.totalSpent)}</strong>
-              </div>
-            ))}
+    <section className="space-y-6">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="p-6 bg-slate-900 text-white">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <span className="text-blue-400 text-xs font-black uppercase tracking-widest">Painel Setorial</span>
+              <h2 className="text-2xl font-black mt-1">{suite.category.label}</h2>
+              <p className="text-slate-400 text-sm mt-2 max-w-2xl">{suite.category.summary}</p>
+            </div>
+            <div className="bg-slate-800 p-3 rounded-lg border border-slate-700 text-right">
+              <strong className="block text-xl leading-none">{suite.indicatorGroups.length}</strong>
+              <span className="text-[10px] uppercase text-slate-500 font-bold">Blocos Analiticos</span>
+            </div>
           </div>
-        </article>
-      </div>
-
-      <div className="suite-groups">
-        {suite.indicatorGroups.map((group) => (
-          <article className="suite-group" key={group.id}>
-            <div className="suite-group-header">
-              <h3>{group.title}</h3>
-              <p>{group.description}</p>
-            </div>
-
-            <div className="suite-indicator-grid">
-              {group.indicators.map((indicator) => (
-                <div className="suite-indicator-card" key={indicator.id}>
-                  <div className="suite-indicator-head">
-                    <span className="suite-dimension">{indicator.dimension}</span>
-                    <span className={`suite-badge is-${indicator.availability}`}>
-                      {accessLabels[indicator.availability]}
-                    </span>
-                  </div>
-                  <strong className="suite-indicator-value">{formatIndicatorValue(indicator)}</strong>
-                  <h4>{indicator.title}</h4>
-                  <p>{indicator.description}</p>
-                  <div className="suite-indicator-meta">
-                    <span>Referencia: {indicator.reference}</span>
-                    <span>
-                      Fontes:{' '}
-                      {indicator.sourceIds
-                        .map((sourceId) => sourceMap.get(sourceId)?.name ?? sourceId)
-                        .join(' / ')}
-                    </span>
-                    {indicator.formula && <span>Calculo: {indicator.formula}</span>}
-                    {indicator.note && <span>Observacao: {indicator.note}</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </article>
-        ))}
-      </div>
-
-      <div className="suite-sources">
-        <div className="suite-group-header">
-          <h3>Fontes preparadas para o setor</h3>
-          <p>
-            Fontes oficiais ja conectadas no painel e fontes catalogadas para a proxima etapa de
-            integracao automatica.
-          </p>
         </div>
-        <div className="suite-source-grid">
-          {suite.sources.map((source) => (
-            <article className="suite-source-card" key={source.id}>
-              <div className="suite-indicator-head">
-                <strong>{source.name}</strong>
-                <span className={`suite-badge is-${source.access}`}>{accessLabels[source.access]}</span>
+
+        <div className="p-6 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 bg-slate-50 border-b border-slate-200">
+          <div className="bg-white p-4 rounded-lg border border-slate-200">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Investimento</span>
+            <strong className="block text-slate-900 mt-1">{formatCurrency(suite.overview.totalSpent)}</strong>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-slate-200">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Contratos</span>
+            <strong className="block text-slate-900 mt-1">{suite.overview.contractsCount}</strong>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-slate-200">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Bairros</span>
+            <strong className="block text-slate-900 mt-1">{suite.overview.districtsCount}</strong>
+          </div>
+          <div className="bg-white p-4 rounded-lg border border-slate-200 lg:col-span-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Principal Orgao</span>
+            <strong className="block text-blue-600 truncate mt-1" title={suite.overview.topAgency ?? ''}>
+              {suite.overview.topAgency || 'N/A'}
+            </strong>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-8">
+          {suite.indicatorGroups.map((group) => (
+            <div key={group.id} className="space-y-4">
+              <div className="flex items-center gap-3">
+                <h3 className="text-sm font-black uppercase tracking-tighter text-slate-900 whitespace-nowrap">{group.title}</h3>
+                <div className="h-px w-full bg-slate-100" />
               </div>
-              <p>{source.summary}</p>
-              <small>{source.owner}</small>
-              {source.url && (
-                <a href={source.url} target="_blank" rel="noreferrer">
-                  Abrir fonte
-                </a>
-              )}
-            </article>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {group.indicators.map((indicator) => (
+                  <div key={indicator.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/30 hover:bg-white hover:shadow-md transition-all group">
+                    <div className="flex justify-between items-start mb-3">
+                      <span className="text-[10px] font-black px-2 py-1 bg-slate-200 rounded text-slate-600">{indicator.dimension}</span>
+                      <span className={cn(
+                        "text-[9px] font-bold px-2 py-0.5 rounded-full uppercase border",
+                        indicator.availability === 'live' ? "bg-green-100 text-green-700 border-green-200" : "bg-slate-100 text-slate-500 border-slate-200"
+                      )}>
+                        {accessLabels[indicator.availability]}
+                      </span>
+                    </div>
+                    <strong className="text-xl font-black text-slate-900 block mb-1 group-hover:text-blue-600">
+                      {formatIndicatorValue(indicator)}
+                    </strong>
+                    <h4 className="text-sm font-bold text-slate-700 leading-tight">{indicator.title}</h4>
+                    <p className="text-xs text-slate-500 mt-2 line-clamp-2">{indicator.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </div>

@@ -2,10 +2,11 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-COPY package.json tsconfig.json tsconfig.node.json vite.config.ts index.html ./
+COPY package*.json ./
 RUN npm install
 
-COPY src ./src
+# Copia todos os arquivos da raiz (incluindo configs do tailwind)
+COPY . .
 
 EXPOSE 5173
 CMD ["npm", "run", "dev"]

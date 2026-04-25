@@ -165,7 +165,7 @@ app.get('/api/expenses/map', async (req, res) => {
     whereClause = `WHERE category = ANY($${queryParams.length}::text[])`;
   }
 
-  queryParams.push(150);
+  queryParams.push(300);
 
   const result = await pool.query(
     `
@@ -236,15 +236,15 @@ app.post('/api/portal/bolsa-familia/sync', async (req, res) => {
 
 app.get('/api/portal/bolsa-familia', async (req, res) => {
   const mesAno = Number(req.query.mesAno);
-  const codigoIbge = req.query.codigoIbge as string;
+  const codigoIbge = (req.query.codigoIbge as string) || '4314902'; // Padrão: Porto Alegre
 
-  if (!mesAno || !codigoIbge) {
-    return res.status(400).json({ message: 'Parâmetros mesAno e codigoIbge são obrigatórios na query' });
+  if (!mesAno) {
+    return res.status(400).json({ message: 'O parâmetro mesAno é obrigatório (ex: 202401)' });
   }
 
   try {
     const data = await getBolsaFamiliaFromDb(mesAno, codigoIbge);
-    res.json(data);
+    res.json(data.length > 0 ? data[0] : null);
   } catch (error: any) {
     console.error('Erro ao ler dados do banco:', error);
     res.status(500).json({ message: 'Erro interno ao buscar os dados' });

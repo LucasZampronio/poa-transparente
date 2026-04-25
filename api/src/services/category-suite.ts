@@ -1069,7 +1069,7 @@ export async function buildCategorySuite(category: string) {
     try {
       const records = await getBolsaFamiliaFromDb(202401, PORTO_ALEGRE_BASELINE.ibgeCode);
       if (records.length > 0) {
-        const totalAmount = records.reduce((acc, curr) => acc + Number(curr.valor), 0);
+        const totalAmount = records.reduce((acc, curr) => acc + Number(curr.valor_transferido), 0);
         
         for (const group of groups) {
           const indicator = group.indicators.find(ind => ind.id === 'bolsa-familia');

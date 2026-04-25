@@ -17,6 +17,7 @@ services:
     container_name: poa-etl
     environment:
       DATABASE_URL: postgresql://poa:poa@postgres:5432/poa_transparente
+    command: python sync_real_data.py
     depends_on:
       - postgres
 
@@ -39,9 +40,12 @@ services:
       context: ./web
     container_name: poa-web
     environment:
-      VITE_API_URL: http://localhost:4000
+      - VITE_API_URL=http://localhost:4000
     ports:
       - "5173:5173"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
     depends_on:
       - api
 

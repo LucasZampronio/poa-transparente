@@ -2,8 +2,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import pg from 'pg';
+import fs from 'fs/promises';
+import path from 'path';
 
 const { Pool } = pg;
+const DIARIO_PATH = path.join(process.cwd(), '..', 'DIARIO.md');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/poatransparente',
@@ -11,7 +14,7 @@ const pool = new Pool({
 
 const server = new McpServer({
   name: "poa-transparente-mentor",
-  version: "1.2.0",
+  version: "1.3.0",
 });
 
 // Recurso: Manifesto do Projeto e Diretriz de Mentoria
@@ -34,23 +37,56 @@ server.resource(
   })
 );
 
-// Ferramenta: Explicar Conceito (Dicionário do Estagiário)
+// Ferramenta: Registrar Progresso Diário (O Diário do Estagiário)
+server.tool(
+  "registrar_progresso_diario",
+  "Salva o resumo do dia, decisões tomadas e conceitos aprendidos no arquivo DIARIO.md",
+  { 
+    resumo: z.string().describe("Resumo das tarefas realizadas"),
+    decisões: z.string().describe("Principais decisões técnicas tomadas"),
+    aprendizado: z.string().describe("Conceitos que o estagiário aprendeu hoje")
+  },
+  async ({ resumo, decisões, aprendizado }) => {
+    const data = new Date().toLocaleDateString('pt-BR');
+    const entrada = `
+## 📅 ${data}
+### 📝 O que fizemos:
+${resumo}
+
+### 💡 Decisões de Software (Papo de Senior):
+${decisões}
+
+### 🎓 O que aprendi hoje:
+${aprendizado}
+
+---
+`;
+    try {
+      await fs.appendFile(DIARIO_PATH, entrada);
+      return {
+        content: [{ type: "text", text: "Progresso registrado com sucesso no DIARIO.md! Bom descanso, estagiário." }]
+      };
+    } catch (error) {
+      return {
+        content: [{ type: "text", text: `Erro ao salvar diário: ${error}` }]
+      };
+    }
+  }
+);
+
+// Ferramenta: Explicar Conceito Técnico
 server.tool(
   "explicar_conceito_tecnico",
   "Explica um termo ou padrão de software de forma simples para o estagiário",
   { termo: z.string() },
   async ({ termo }) => {
-    // Aqui poderíamos ter uma lógica mais complexa, mas vamos deixar o LLM gerar a explicação baseada no contexto
     return {
-      content: [{ 
-        type: "text", 
-        text: `Vou preparar uma explicação de 'Senior para Estagiário' sobre: ${termo}. Aguarde meu raciocínio.` 
-      }]
+      content: [{ type: "text", text: `Vou preparar uma explicação de 'Senior para Estagiário' sobre: ${termo}.` }]
     };
   }
 );
 
-// Ferramentas de dados mantidas...
+// Ferramenta: Buscar Gastos por Bairro
 server.tool(
   "buscar_gastos_por_bairro",
   "Consulta no banco de dados os gastos públicos em um bairro específico",
