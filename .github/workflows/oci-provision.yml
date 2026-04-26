@@ -1,0 +1,35 @@
+name: "OCI ARM Fishing - Try Every Hour"
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Roda no minuto 0 de cada hora
+  workflow_dispatch: # Permite rodar clicando no botão no GitHub
+
+jobs:
+  try-provision:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup OCI CLI
+        uses: oracle-actions/setup-oci-cli@v1
+        with:
+          user: ${{ secrets.OCI_USER_OCID }}
+          fingerprint: ${{ secrets.OCI_FINGERPRINT }}
+          tenancy: ${{ secrets.OCI_TENANCY_OCID }}
+          region: ${{ secrets.OCI_REGION }}
+          api_key: ${{ secrets.OCI_API_KEY }}
+
+      - name: "Try Launch Instance"
+        run: |
+          # Tentativa de criação via CLI
+          # Se falhar por falta de capacidade, o script continua e não marca como falha do job
+          oci compute instance launch \
+            --availability-domain "${{ secrets.OCI_AD }}" \
+            --compartment-id "${{ secrets.OCI_COMPARTMENT_OCID }}" \
+            --shape "VM.Standard.A1.Flex" \
+            --shape-config '{"cpus": 4, "memoryInGBs": 24}' \
+            --image-id "${{ secrets.OCI_IMAGE_OCID }}" \
+            --subnet-id "${{ secrets.OCI_SUBNET_OCID }}" \
+            --assign-public-ip true \
+            --display-name "poa-transparente-prod" \
+            --ssh-authorized-keys-file <(echo "${{ secrets.SSH_PUBLIC_KEY }}") \
+            || echo "Sem capacidade na Oracle Cloud agora. Tentando novamente na próxima hora."

@@ -106,5 +106,70 @@ server.tool(
   }
 );
 
+// Ferramenta: Buscar Obras TCE (Direto da API)
+server.tool(
+  "buscar_obras_tce",
+  "Consulta a API oficial do TCE-RS para buscar obras públicas reais em Porto Alegre",
+  { ano: z.number().describe("Ano de exercício (ex: 2024)") },
+  async ({ ano }) => {
+    const CNPJ_POA = "92963560000160";
+    const MUNICIPIO_CODE = "88301";
+    const url = `https://portal.tce.rs.gov.br/api/obras/v1/orgaos/${CNPJ_POA}/obras?municipio=${MUNICIPIO_CODE}&exercicio=${ano}&page=0&size=5`;
+
+    try {
+      const response = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0 (Gemini Mentor)" }
+      });
+      
+      if (!response.ok) {
+        return { content: [{ type: "text", text: `Erro na API do TCE: ${response.statusText}` }] };
+      }
+
+      const data: any = await response.json();
+      const works = data.content || [];
+      
+      if (works.length === 0) {
+        return { content: [{ type: "text", text: `Nenhuma obra encontrada para o ano ${ano}.` }] };
+      }
+
+      const formatted = works.map((w: any) => 
+        `- ID: ${w.idObra} | Objeto: ${w.descricaoObjeto?.substring(0, 100)}... | Valor Garantia: R$ ${w.valorGarantiaObra || 'N/A'}`
+      ).join('\n');
+
+      return { 
+        content: [{ 
+          type: "text", 
+          text: `Resultados em tempo real do TCE-RS (${ano}):\n${formatted}\n\nNota de Mentor: Estes dados vêm direto do Tribunal de Contas. No banco local, nós multiplicamos o valor da garantia por 20 para estimar o valor total.` 
+        }] 
+      };
+    } catch (error) {
+      return { content: [{ type: "text", text: `Erro na requisição: ${error}` }] };
+    }
+  }
+);
+
+// Ferramenta: Sincronizar Obras TCE
+server.tool(
+  "sincronizar_obras_tce",
+  "Dispara a sincronização de obras do TCE-RS para o banco de dados local",
+  { ano: z.number().default(2024) },
+  async ({ ano }) => {
+    try {
+      const response = await fetch('http://localhost:4000/api/sync/tce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ year: ano })
+      });
+      const data: any = await response.json();
+      if (data.success) {
+        return { content: [{ type: "text", text: `Sucesso! Sincronizadas ${data.count} obras para o ano ${ano}.` }] };
+      }
+      return { content: [{ type: "text", text: `Falha na sincronização: ${data.error}` }] };
+    } catch (error) {
+      return { content: [{ type: "text", text: `Erro ao conectar com a API: ${error}. Certifique-se que o backend está rodando na porta 4000.` }] };
+    }
+  }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

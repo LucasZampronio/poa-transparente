@@ -78,5 +78,34 @@ server.tool("buscar_gastos_por_bairro", "Consulta no banco de dados os gastos p�
         return { content: [{ type: "text", text: "Erro na query." }] };
     }
 });
+// Ferramenta: Buscar Obras TCE (Direto da API)
+server.tool("buscar_obras_tce", "Consulta a API oficial do TCE-RS para buscar obras públicas reais em Porto Alegre", { ano: z.number().describe("Ano de exercício (ex: 2024)") }, async ({ ano }) => {
+    const CNPJ_POA = "92963560000160";
+    const MUNICIPIO_CODE = "88301";
+    const url = `https://portal.tce.rs.gov.br/api/obras/v1/orgaos/${CNPJ_POA}/obras?municipio=${MUNICIPIO_CODE}&exercicio=${ano}&page=0&size=5`;
+    try {
+        const response = await fetch(url, {
+            headers: { "User-Agent": "Mozilla/5.0 (Gemini Mentor)" }
+        });
+        if (!response.ok) {
+            return { content: [{ type: "text", text: `Erro na API do TCE: ${response.statusText}` }] };
+        }
+        const data = await response.json();
+        const works = data.content || [];
+        if (works.length === 0) {
+            return { content: [{ type: "text", text: `Nenhuma obra encontrada para o ano ${ano}.` }] };
+        }
+        const formatted = works.map((w) => `- ID: ${w.idObra} | Objeto: ${w.descricaoObjeto?.substring(0, 100)}... | Valor Garantia: R$ ${w.valorGarantiaObra || 'N/A'}`).join('\n');
+        return {
+            content: [{
+                    type: "text",
+                    text: `Resultados em tempo real do TCE-RS (${ano}):\n${formatted}\n\nNota de Mentor: Estes dados vêm direto do Tribunal de Contas. No banco local, nós multiplicamos o valor da garantia por 20 para estimar o valor total.`
+                }]
+        };
+    }
+    catch (error) {
+        return { content: [{ type: "text", text: `Erro na requisição: ${error}` }] };
+    }
+});
 const transport = new StdioServerTransport();
 await server.connect(transport);

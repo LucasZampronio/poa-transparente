@@ -137,12 +137,12 @@ export default function App() {
           </div>
         ) : (
           <>
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* KPI Cards - Grid responsiva: 1 col no mobile, 2 no tablet, 4 no desktop */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
               {cards.map((card) => (
-                <div key={card.label} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">{card.label}</span>
-                  <strong className={`text-xl md:text-2xl font-black ${card.color}`}>{card.value}</strong>
+                <div key={card.label} className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
+                  <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1 md:mb-2">{card.label}</span>
+                  <strong className={`text-lg md:text-2xl font-black ${card.color} block truncate`}>{card.value}</strong>
                 </div>
               ))}
             </div>

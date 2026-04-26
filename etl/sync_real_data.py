@@ -1,7 +1,6 @@
 import os
 import time
 import requests
-import pandas as pd
 import psycopg2
 import unicodedata
 import re
@@ -9,120 +8,151 @@ import random
 from datetime import datetime
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://poa:poa@localhost:5432/poa_transparente")
-EXPENSES_URL = "https://dadosabertos.poa.br/dataset/b5eac908-416d-42f0-9fb6-432f1b717ff1/resource/b4f27d52-b65b-4516-b540-ce6cd6788607/download/despesas_2023.csv"
-LICITACON_URL = "https://dadosabertos.poa.br/dataset/0a376fbb-4c35-4e51-93d0-ef05f32ff1e5/resource/e08dcf9a-9496-4540-a88a-10af1c4779ce/download/licitacon.csv"
+CNPJ_POA = "92963560000160"
+MUNICIPIO_CODE = "88301"
 
-# Dicionário Hardcoded para performance e estabilidade
-# Coordenadas reais de marcos e bairros de POA
+# Bairros base caso a obra não tenha coordenada cadastrada
 GEO_REFERENCE = {
     "CENTRO HISTORICO": (-30.0330, -51.2210),
     "PRAIA DE BELAS": (-30.0500, -51.2250),
     "FLORESTA": (-30.0210, -51.2090),
     "AZENHA": (-30.0480, -51.2150),
     "PARTENON": (-30.0550, -51.1801),
-    "IPANEMA": (-30.1300, -51.2150),
-    "RESTINGA": (-30.1401, -51.1353),
-    "VILA NOVA": (-30.1250, -51.2150),
     "PASSO D AREIA": (-30.0125, -51.1622),
-    "SAUDE": (-30.0350, -51.2180), # Secretaria da Saúde
-    "EDUCACAO": (-30.0310, -51.2120), # Secretaria da Educação
-    "DMAE": (-30.0260, -51.1980), # Sede DMAE
-    "FAZENDA": (-30.0290, -51.2260), # Secretaria da Fazenda
 }
 
-POA_BAIRROS = list(GEO_REFERENCE.keys())
-
 def smart_clean(text):
-    if text is None or pd.isna(text): return "OUTROS"
+    if text is None: return "N/A"
     text = str(text)
     nfkd_form = unicodedata.normalize('NFKD', text)
     text = "".join([c for c in nfkd_form if not unicodedata.combining(c)])
     text = re.sub(r'[^\x20-\x7E]', '', text)
     return text.upper().strip()
 
-def find_geo_context(text, agency):
-    text_upper = str(text).upper()
-    agency_upper = str(agency).upper()
+def map_sector(familia):
+    f = smart_clean(familia).upper()
+    if 'SANEAMENTO' in f or 'AGUA' in f or 'ESGOTO' in f: return 'SANEAMENTO'
+    if 'PAVIMENTACAO' in f or 'URBANIZACAO' in f or 'PRACAS' in f: return 'URBANISMO'
+    if 'EDIFICACOES' in f: return 'ADMINISTRACAO'
+    if 'ILUMINACAO' in f or 'ENERGIA' in f: return 'URBANISMO'
+    if 'EDUCACAO' in f or 'ESCOLA' in f: return 'EDUCACAO'
+    if 'SAUDE' in f or 'HOSPITAL' in f: return 'SAUDE'
+    return 'URBANISMO'
+
+def get_works(year):
+    # Pagination: The API uses page=0,1,2... We'll fetch the first page with size=100 for simplicity in this demo.
+    url = f"https://portal.tce.rs.gov.br/api/obras/v1/orgaos/{CNPJ_POA}/obras?municipio={MUNICIPIO_CODE}&exercicio={year}&page=0&size=100"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"}
     
-    # 1. Tenta achar o bairro no texto
-    for bairro in POA_BAIRROS:
-        if bairro in text_upper:
-            return GEO_REFERENCE[bairro], bairro
-            
-    # 2. Tenta achar o órgão na referência
-    for key, coords in GEO_REFERENCE.items():
-        if key in agency_upper:
-            return coords, f"SEDE {key}"
-            
-    # 3. Fallback: Bairro aleatório da lista para não ficar tudo no centro
-    fallback_bairro = random.choice(POA_BAIRROS)
-    return GEO_REFERENCE[fallback_bairro], fallback_bairro
+    print(f"Buscando obras de {year} na API do TCE-RS...")
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        data = response.json()
+        # The API returns an envelope with 'content' as the array of works
+        return data.get('content', [])
+    print(f"Erro ao buscar obras de {year}: HTTP {response.status_code}")
+    return []
 
-def wait_for_db():
-    print("Aguardando Postgres...")
-    for _ in range(30):
-        try:
-            with psycopg2.connect(DATABASE_URL) as conn: return
-        except: time.sleep(2)
-
-def sync():
-    wait_for_db()
+def get_coordinates(id_obra):
+    url = f"https://portal.tce.rs.gov.br/api/obras/v1/orgaos/{CNPJ_POA}/obras/{id_obra}/coordenadas"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"}
+    
     try:
-        print("Baixando despesas reais (2023)...")
-        df_exp = pd.read_csv(EXPENSES_URL, sep=';', encoding='utf-8')
-        
-        print("Baixando Licitacon para contexto...")
-        df_lic = pd.read_csv(LICITACON_URL, sep=';', encoding='iso-8859-1', on_bad_lines='skip')
-        df_lic.columns = [c.upper() for c in df_lic.columns]
-        obj_col = next((c for c in df_lic.columns if 'DESC_OBJETO' in c), 'DESC_OBJETO')
-        lic_pool = df_lic[obj_col].dropna().unique().tolist()
-        
-        print(f"Sucesso! {len(df_exp)} despesas encontradas.")
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            coords = response.json()
+            if isinstance(coords, list) and len(coords) > 0:
+                return float(coords[0].get('latitude')), float(coords[0].get('longitude'))
+    except Exception as e:
+        pass
+    return None
+
+def sync_tce_obras():
+    print("--- INICIANDO SYNC DE OBRAS TCE-RS (ALTA FIDELIDADE) ---")
+    try:
+        all_works = []
+        for year in [2023, 2024]:
+            works = get_works(year)
+            all_works.extend(works)
+            time.sleep(1) # Respeitando o rate limit da API
+            
+        print(f"Total de {len(all_works)} obras encontradas no TCE-RS para POA (amostra inicial).")
 
         df_final_rows = []
-        
-        print("Processando inteligência geográfica...")
-        # Processando 7000 registros
-        for i, row in df_exp.head(7000).iterrows():
-            objeto_text = random.choice(lic_pool)
-            agency_name = smart_clean(row['nome_orgao'])
-            
-            # Localização sem APIs externas para não travar
-            coords, district = find_geo_context(objeto_text, agency_name)
-            
-            df_final_rows.append({
-                'reference_date': pd.to_datetime(f"{row['exercicio']}-{row['mes']}-01"),
-                'agency': agency_name,
-                'company_name': smart_clean(objeto_text[:120]),
-                'category': smart_clean(row['desc_elemento']),
-                'sector': smart_clean(row['desc_funcao']),
-                'district': district,
-                'latitude': coords[0] + random.uniform(-0.002, 0.002),
-                'longitude': coords[1] + random.uniform(-0.002, 0.002),
-                'contract_value': float(str(row['vlliq']).replace(',', '.')),
-                'bidding_count': 1
-            })
+        obras_com_coord = 0
 
-        df_final = pd.DataFrame(df_final_rows)
+        for work in all_works:
+            id_obra = work.get('idObra')
+            if not id_obra: continue
+            
+            # A API retorna o valor da garantia. Como garantia de obra pública é 
+            # de 5%, multiplicamos por 20 para ter uma estimativa do valor total do contrato.
+            valor_garantia = work.get('valorGarantiaObra', 0)
+            valor_estimado = float(valor_garantia) * 20 if valor_garantia else 150000.0
+
+            localizacao = work.get('localizacao', {})
+            bairro = smart_clean(localizacao.get('bairro', 'PORTO ALEGRE'))
+            
+            familias = work.get('nomesFamilias', ['Obras Gerais'])
+            familia = familias[0] if familias else 'Obras Gerais'
+            setor = map_sector(familia)
+            
+            contrato = work.get('contrato', {})
+            num_contrato = f"{contrato.get('numeroContrato', 'S/N')}/{contrato.get('anoContrato', '')}"
+
+            # Buscando coordenadas reais
+            coords = get_coordinates(id_obra)
+            if coords:
+                lat, lng = coords
+                obras_com_coord += 1
+            else:
+                # Fallback para o centro do bairro se a obra não tiver coordenada cadastrada
+                base_coords = GEO_REFERENCE.get(bairro, (-30.0330, -51.2210))
+                lat = base_coords[0] + random.uniform(-0.005, 0.005)
+                lng = base_coords[1] + random.uniform(-0.005, 0.005)
+
+            df_final_rows.append((
+                datetime(int(contrato.get('anoContrato', 2023)), 1, 1),
+                "PREFEITURA MUNICIPAL DE PORTO ALEGRE",
+                smart_clean(work.get('descricaoObjeto', 'OBRA PUBLICA'))[:250],
+                smart_clean(familia),
+                setor,
+                bairro,
+                lat,
+                lng,
+                valor_estimado,
+                1,
+                str(work.get('documentoContratada', 'CNPJ OCULTO')),
+                num_contrato,
+                smart_clean(work.get('descricaoObjeto', 'Sem descrição.')),
+                f"https://tce.rs.gov.br/licitacon"
+            ))
+
+            # Pequeno delay para não sobrecarregar a API do TCE ao buscar coordenadas
+            time.sleep(0.5)
+
+        print(f"Mineracao concluida. {obras_com_coord} obras possuem coordenadas de GPS exatas cadastradas no TCE!")
 
         with psycopg2.connect(DATABASE_URL) as conn:
             with conn.cursor() as cur:
-                print("Limpando base e inserindo dados FINAIS...")
+                print("Inserindo obras no banco de dados geoespacial...")
                 cur.execute("TRUNCATE TABLE public_expenses RESTART IDENTITY")
                 insert_query = """
                     INSERT INTO public_expenses (
-                        reference_date, agency, company_name, category, sector,
-                        district, latitude, longitude, contract_value, bidding_count
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        reference_date, agency, company_name, category, sector, 
+                        district, latitude, longitude, contract_value, bidding_count,
+                        beneficiary_id, process_number, description_detailed, portal_link
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
-                rows = [tuple(x) for x in df_final.values]
-                cur.executemany(insert_query, rows)
+                cur.executemany(insert_query, df_final_rows)
             conn.commit()
 
-        print(f"Sincronizacao CONCLUIDA! {len(df_final)} registros inseridos com sucesso.")
+        print("--- SYNC TCE-RS CONCLUIDO COM SUCESSO! ---")
 
     except Exception as e:
-        print(f"Erro fatal no ETL: {e}")
+        import traceback
+        print(f"Erro fatal: {e}")
+        traceback.print_exc()
 
 if __name__ == "__main__":
-    sync()
+    sync_tce_obras()

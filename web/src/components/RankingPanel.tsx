@@ -20,15 +20,15 @@ export default function RankingPanel({ title, rows, labelKey, valueKey }: Props)
           ) : (
             rows.map((row, idx) => (
               <li key={`${row[labelKey]}-${idx}`} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 text-xs font-bold">
+                <div className="flex items-center gap-2 md:gap-3 overflow-hidden flex-1">
+                  <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 text-[10px] md:text-xs font-bold">
                     {idx + 1}
                   </span>
-                  <span className="text-sm font-medium text-slate-700 truncate group-hover:text-blue-600 transition-colors">
+                  <span className="text-xs md:text-sm font-medium text-slate-700 truncate group-hover:text-blue-600 transition-colors">
                     {row[labelKey]}
                   </span>
                 </div>
-                <strong className="text-sm font-black text-slate-900 ml-4 tabular-nums">
+                <strong className="text-xs md:text-sm font-black text-slate-900 ml-2 md:ml-4 tabular-nums flex-shrink-0">
                   {formatCurrency(row[valueKey] ?? 0)}
                 </strong>
               </li>

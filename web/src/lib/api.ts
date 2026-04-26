@@ -42,15 +42,6 @@ export type TimeseriesRow = {
   total_spent: string;
 };
 
-export type BolsaFamiliaData = {
-  id: number;
-  mes_ano: number;
-  codigo_ibge: string;
-  nome_municipio: string;
-  valor_transferido: string;
-  quantidade_beneficiarios: number;
-};
-
 export function formatCurrency(value: number | string) {
   const num = Number(value);
   return num.toLocaleString('pt-BR', { 
@@ -61,20 +52,29 @@ export function formatCurrency(value: number | string) {
   });
 }
 
-// Dicionário de rótulos amigáveis para Setores e Categorias
+// MAPEAMENTO COMPLETO DE SETORES (DataPoa -> Humano)
 const labels: Record<string, string> = {
   'SAUDE': 'Saúde',
   'EDUCACAO': 'Educação',
   'SEGURANCA PUBLICA': 'Segurança',
-  'TRANSPORTES': 'Transporte',
+  'TRANSPORTE': 'Transporte',
   'ADMINISTRACAO': 'Gestão Pública',
-  'ASSISTENCIA SOCIAL': 'Social',
-  'URBANISMO': 'Cidade/Urbanismo',
-  'SANEAMENTO': 'Dmae/Saneamento',
-  'ENCARGOS ESPECIAIS': 'Dívida/Encargos',
+  'URBANISMO': 'Urbanismo',
+  'SANEAMENTO': 'Saneamento/Dmae',
+  'ENCARGOS ESPECIAIS': 'Dívidas/Encargos',
   'CULTURA': 'Cultura e Lazer',
-  'HABITACAO': 'Habitação',
-  'GESTÃO AMBIENTAL': 'Meio Ambiente',
+  'HABITACAO': 'Habitação/Demhab',
+  'GESTAO AMBIENTAL': 'Meio Ambiente',
+  'ASSISTENCIA SOCIAL': 'Assistência Social',
+  'JUDICIARIA': 'Judiciário/PGM',
+  'LEGISLATIVA': 'Legislativo',
+  'DIREITOS DA CIDADANIA': 'Direitos Humanos',
+  'CIENCIA E TECNOLOGIA': 'Tecnologia',
+  'COMERCIO E SERVICOS': 'Desenvolvimento',
+  'TRABALHO': 'Trabalho/Emprego',
+  'AGRICULTURA': 'Agricultura',
+  'PREVIDENCIA SOCIAL': 'Previdência',
+  'RESERVA DE CONTINGANCIA/RPPS': 'Reserva/RPPS'
 };
 
 export function formatLabel(text: string) {
