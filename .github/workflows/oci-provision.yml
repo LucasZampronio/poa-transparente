@@ -23,8 +23,7 @@ jobs:
       - name: "Try Launch Instance"
         run: |
           # Tentativa de criação via CLI
-          # Se falhar por falta de capacidade, o script continua e não marca como falha do job
-          oci compute instance launch \
+          if oci compute instance launch \
             --availability-domain "${{ secrets.OCI_AD }}" \
             --compartment-id "${{ secrets.OCI_COMPARTMENT_OCID }}" \
             --shape "VM.Standard.A1.Flex" \
@@ -33,5 +32,9 @@ jobs:
             --subnet-id "${{ secrets.OCI_SUBNET_OCID }}" \
             --assign-public-ip true \
             --display-name "poa-transparente-prod" \
-            --ssh-authorized-keys-file <(echo "${{ secrets.SSH_PUBLIC_KEY }}") \
-            || echo "Sem capacidade na Oracle Cloud agora. Tentando novamente na próxima hora."
+            --ssh-authorized-keys-file <(echo "${{ secrets.SSH_PUBLIC_KEY }}"); then
+            echo "Instância criada com sucesso!"
+          else
+            echo "::error title=OCI Capacity Error::Sem capacidade para instâncias ARM (Always Free) na Oracle Cloud agora. Tentando novamente na próxima hora."
+            exit 0 # Mantém o job como sucesso para não disparar alertas críticos, mas o erro acima fica visível nos logs.
+          fi
