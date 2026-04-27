@@ -16,7 +16,7 @@ jobs:
       OCI_CLI_REGION: ${{ secrets.OCI_REGION }}
     steps:
       - name: Setup OCI CLI
-        uses: oracle-actions/run-oci-cli-command@v1
+        uses: oracle-actions/run-oci-cli-command@v1.3.2
         with:
           command: '--version' # Minimal command to trigger CLI installation and config
 
