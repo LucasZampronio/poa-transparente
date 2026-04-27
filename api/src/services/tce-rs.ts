@@ -93,7 +93,7 @@ export async function syncTceObras(year: number) {
         obra.documentoContratada || 'CNPJ OCULTO',
         numContrato,
         obra.descricaoObjeto || 'Sem descrição.',
-        'https://tce.rs.gov.br/licitacon'
+        `https://compras.tce.rs.gov.br/publico/obras/${idObra}`
       ]);
     }
 

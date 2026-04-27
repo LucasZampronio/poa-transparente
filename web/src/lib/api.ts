@@ -22,6 +22,9 @@ export type MapPoint = {
   category: string;
   sector: string;
   contract_value: string;
+  portal_link: string;
+  process_number: string;
+  description_detailed: string;
 };
 
 export type MapCategory = {

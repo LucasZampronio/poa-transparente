@@ -125,7 +125,7 @@ def sync_tce_obras():
                 str(work.get('documentoContratada', 'CNPJ OCULTO')),
                 num_contrato,
                 smart_clean(work.get('descricaoObjeto', 'Sem descrição.')),
-                f"https://tce.rs.gov.br/licitacon"
+                f"https://compras.tce.rs.gov.br/publico/obras/{id_obra}"
             ))
 
             # Pequeno delay para não sobrecarregar a API do TCE ao buscar coordenadas
