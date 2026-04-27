@@ -15,10 +15,18 @@ jobs:
       OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_API_KEY }}
       OCI_CLI_REGION: ${{ secrets.OCI_REGION }}
     steps:
+      - name: "Clean OCI Secrets"
+        run: |
+          # Remove espaços e quebras de linha que podem ter vindo ao colar os secrets
+          echo "OCI_CLI_USER=$(echo "${{ secrets.OCI_USER_OCID }}" | tr -d '\r\n ')" >> $GITHUB_ENV
+          echo "OCI_CLI_TENANCY=$(echo "${{ secrets.OCI_TENANCY_OCID }}" | tr -d '\r\n ')" >> $GITHUB_ENV
+          echo "OCI_CLI_FINGERPRINT=$(echo "${{ secrets.OCI_FINGERPRINT }}" | tr -d '\r\n ')" >> $GITHUB_ENV
+          echo "OCI_CLI_REGION=$(echo "${{ secrets.OCI_REGION }}" | tr -d '\r\n ')" >> $GITHUB_ENV
+
       - name: Setup OCI CLI
         uses: oracle-actions/run-oci-cli-command@v1.3.2
         with:
-          command: '--version' # Minimal command to trigger CLI installation and config
+          command: '--version'
 
       - name: "Try Launch Instance"
         run: |
@@ -32,9 +40,14 @@ jobs:
             --subnet-id "${{ secrets.OCI_SUBNET_OCID }}" \
             --assign-public-ip true \
             --display-name "poa-transparente-prod" \
-            --ssh-authorized-keys-file <(echo "${{ secrets.SSH_PUBLIC_KEY }}"); then
+            --ssh-authorized-keys-file <(echo "${{ secrets.SSH_PUBLIC_KEY }}") 2>error.log; then
             echo "Instância criada com sucesso!"
           else
-            echo "::error title=OCI Capacity Error::Sem capacidade para instâncias ARM (Always Free) na Oracle Cloud agora. Tentando novamente na próxima hora."
-            exit 0 # Mantém o job como sucesso para não disparar alertas críticos, mas o erro acima fica visível nos logs.
+            ERROR_MSG=$(cat error.log)
+            if echo "$ERROR_MSG" | grep -q "Out of capacity"; then
+              echo "::error title=OCI Capacity Error::Sem capacidade para instâncias ARM agora. Tentando na próxima hora."
+            else
+              echo "::error title=OCI CLI Error::Erro na execução da CLI. Verifique os Secrets. Detalhes: $ERROR_MSG"
+            fi
+            exit 0
           fi
