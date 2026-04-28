@@ -18,7 +18,7 @@ Este projeto foi montado para simular um cenário real de produto:
 - PostgreSQL (`db/init/`): Schema analítico com camadas Bronze/Prata e caches de geocodificação.
 - Node.js + TypeScript (`api/`): API REST integrada ao TCE-RS e ao Portal da Transparência Federal (Bolsa Família).
 - Geolocalização: Coordenadas oficiais do TCE-RS + Fallback via **Nominatim (OSM)**.
-- React + Vite + Leaflet (`web/`): Dashboard interativo com visualização geográfica de obras e gastos.
+- React + Vite + **MapLibre GL JS** (`web/`): Dashboard interativo com visualização geográfica vetorial (Dark Matter).
 - Prometheus (`monitoring/prometheus/`): Scraping de métricas de performance e negócio.
 - Grafana (`monitoring/grafana/`): Dashboards provisionados para observabilidade total.
 
