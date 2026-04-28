@@ -14,21 +14,39 @@ Este projeto foi montado para simular um cenário real de produto:
 
 ## Arquitetura
 
-- Python (`etl/`): Sincronização inteligente via API CKAN (DadosAbertos.Poa)
-- PostgreSQL (`db/init/`): Schema analítico e persistência
-- Node.js + TypeScript (`api/`): API REST com integração ao Portal da Transparência Federal (Bolsa Família)
-- React + Vite + Leaflet (`web/`): dashboard web e mapa
-- Prometheus (`monitoring/prometheus/`): scraping de métricas
-- Grafana (`monitoring/grafana/`): dashboards provisionados
+- Python (`etl/`): Sincronização inteligente via **API LicitaCon (TCE-RS)** com enriquecimento de dados.
+- PostgreSQL (`db/init/`): Schema analítico com camadas Bronze/Prata e caches de geocodificação.
+- Node.js + TypeScript (`api/`): API REST integrada ao TCE-RS e ao Portal da Transparência Federal (Bolsa Família).
+- Geolocalização: Coordenadas oficiais do TCE-RS + Fallback via **Nominatim (OSM)**.
+- React + Vite + Leaflet (`web/`): Dashboard interativo com visualização geográfica de obras e gastos.
+- Prometheus (`monitoring/prometheus/`): Scraping de métricas de performance e negócio.
+- Grafana (`monitoring/grafana/`): Dashboards provisionados para observabilidade total.
 
 ## Estrutura de pastas
 
-- `api/`: serviço HTTP e métricas Prometheus
-- `web/`: front-end React
-- `etl/`: carga inicial de dados
-- `db/init/`: script SQL de criação de tabela/índices
-- `monitoring/`: Prometheus + provisão do Grafana
-- `docker-compose.yml`: orquestração completa
+- `api/`: Serviço HTTP e integração com APIs de transparência.
+- `web/`: Front-end React com mapas e dashboards.
+- `etl/`: Scripts de carga, limpeza e enriquecimento (TCE-RS).
+- `mcp/`: Servidor Model Context Protocol (IA-ready).
+- `db/init/`: Scripts SQL, índices e definições de schema.
+- `monitoring/`: Configurações de Prometheus e Grafana.
+- `terraform/`: Infraestrutura como código para Oracle Cloud.
+- `.github/workflows/`: Automação de provisionamento (OCI) e CI/CD.
+- `docker-compose.yml`: Orquestração completa do ambiente local.
+
+## Novidade: Servidor MCP (Mentor)
+
+Implementamos um servidor baseado no **Model Context Protocol (MCP)** que permite que assistentes de IA (como Claude ou Gemini) consultem diretamente o banco de dados de transparência.
+
+- Localização: `mcp/`
+- Ferramentas: `buscar_gastos_por_bairro`, `buscar_obras_tce`, `explicar_conceito_tecnico`.
+
+## Infraestrutura e Cloud (OCI)
+
+O projeto conta com provisionamento automatizado na **Oracle Cloud (OCI)** usando o plano *Always Free*. Devido às restrições de capacidade da OCI, implementamos um workflow de "pesca" (retry loop) via GitHub Actions que tenta alocar instâncias ARM automaticamente.
+
+- Consulte `DEPLOY_OCI.md` para detalhes do setup manual.
+- Veja `.github/workflows/oci-provision.yml` para a automação.
 
 ## Pré-requisitos
 
@@ -163,10 +181,10 @@ Parar e remover volumes:
 
 ## Próximos passos
 
-- conectar ingestão real do portal da transparência
-- adicionar filtros por período/órgão/categoria via query params
-- incluir autenticação e controle de acesso
-- criar alertas no Grafana para erro e latência
+- Expandir filtros por período/órgão/categoria via query params na interface.
+- Implementar alertas automáticos no Grafana para desvios de latência e erros 5xx.
+- Adicionar camada de autenticação (JWT) para endpoints administrativos.
+- Integrar dados históricos de anos anteriores (pré-2022) para análise de tendências.
 
 ## Nota
 
