@@ -37,11 +37,12 @@ jobs:
       - name: "Try Launch Instance"
         run: |
           # Usa as variáveis de ambiente higienizadas
+          # CORREÇÃO: O campo correto é 'ocpus', não 'cpus'
           if oci compute instance launch \
             --availability-domain "$OCI_AD" \
             --compartment-id "$OCI_COMPARTMENT" \
             --shape "VM.Standard.A1.Flex" \
-            --shape-config '{"cpus": 4, "memoryInGBs": 24}' \
+            --shape-config '{"ocpus": 4, "memoryInGBs": 24}' \
             --image-id "$OCI_IMAGE" \
             --subnet-id "$OCI_SUBNET" \
             --assign-public-ip true \
@@ -52,8 +53,10 @@ jobs:
             ERROR_MSG=$(cat error.log)
             if echo "$ERROR_MSG" | grep -iq "Out of capacity"; then
               echo "::error title=OCI Capacity Error::Sem capacidade para instâncias ARM agora. Tentando na próxima hora."
+            elif echo "$ERROR_MSG" | grep -iq "NotAuthorizedOrNotFound"; then
+              echo "::error title=OCI Auth Error::ID de Compartment, Imagem ou Subnet não encontrado ou sem permissão. Verifique os OCIDs e a Região."
             else
-              echo "::error title=OCI CLI Error::Erro na execução da CLI (400). Detalhes: $ERROR_MSG"
+              echo "::error title=OCI CLI Error::Erro 400 ou similar. Verifique os parâmetros. Detalhes: $ERROR_MSG"
             fi
             exit 0
           fi
