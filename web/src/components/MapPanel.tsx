@@ -46,7 +46,7 @@ export default function MapPanel({ points, sectors, categories, selectedSector, 
     if (!mapContainer.current) return;
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+      style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
       center: [-51.23, -30.03],
       zoom: 12,
     });
@@ -62,6 +62,8 @@ export default function MapPanel({ points, sectors, categories, selectedSector, 
     popup.current?.remove();
 
     points.forEach((point) => {
+      if (!point.latitude || !point.longitude) return;
+      
       const lat = Number(point.latitude);
       const lng = Number(point.longitude);
       if (isNaN(lat) || isNaN(lng)) return;
@@ -70,19 +72,19 @@ export default function MapPanel({ points, sectors, categories, selectedSector, 
       const iconPath = ICONS[point.sector] || ICONS['DEFAULT'];
       
       const el = document.createElement('div');
-      el.style.width = '30px';
-      el.style.height = '30px';
+      el.style.width = '24px';
+      el.style.height = '24px';
       el.style.backgroundColor = color;
-      el.style.borderRadius = '10px';
-      el.style.border = '2px solid white';
-      el.style.boxShadow = '0 4px 10px rgba(0,0,0,0.3)';
+      el.style.borderRadius = '6px';
+      el.style.border = '1px solid rgba(255,255,255,0.5)';
+      el.style.boxShadow = `0 0 15px ${color}66`;
       el.style.display = 'flex';
       el.style.alignItems = 'center';
       el.style.justifyContent = 'center';
       el.style.cursor = 'pointer';
       el.style.color = 'white';
 
-      el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none;">${iconPath}</svg>`;
+      el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none;">${iconPath}</svg>`;
 
       const marker = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map.current!);
 
@@ -91,37 +93,41 @@ export default function MapPanel({ points, sectors, categories, selectedSector, 
         popup.current!
           .setLngLat([lng, lat])
           .setHTML(`
-            <div style="padding: 15px; font-family: 'Inter', sans-serif;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span style="background: ${color}20; color: ${color}; padding: 4px 10px; border-radius: 99px; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.05em;">
+            <div style="padding: 24px; font-family: 'Inter', sans-serif; width: 320px; background: #0f172a; color: white; border-radius: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <span style="background: ${color}; color: white; padding: 4px 12px; border-radius: 99px; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em;">
                   ${formatLabel(point.sector)}
                 </span>
-                <span style="color: #94a3b8; font-size: 10px; font-weight: 700;">ID: ${point.process_number}</span>
+                <span style="color: #64748b; font-size: 10px; font-weight: 700; font-family: monospace;">#${point.process_number}</span>
               </div>
               
-              <div style="margin-bottom: 15px;">
-                <div style="font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px;">Favorecido Receptador</div>
-                <strong style="color: #0f172a; font-size: 14px; line-height: 1.3;">${point.company_name}</strong>
-              </div>
-
-              <div style="margin-bottom: 15px; background: #f0f9ff; padding: 12px; border-radius: 8px; border: 1px solid #bae6fd;">
-                <div style="font-size: 10px; font-weight: 800; color: #0369a1; text-transform: uppercase; margin-bottom: 6px;">Objeto da Despesa (Real)</div>
-                <div style="color: #0c4a6e; font-size: 12px; font-weight: 500; line-height: 1.5;">"${point.description_detailed}"</div>
-              </div>
-
-              <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #f1f5f9; padding-top: 12px;">
-                <div>
-                  <div style="font-size: 9px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Ministério/Órgão</div>
-                  <div style="font-size: 11px; font-weight: 600; color: #0f172a;">${point.agency}</div>
-                </div>
-                <div style="text-align: right;">
-                  <div style="font-size: 9px; font-weight: 700; color: #94a3b8; text-transform: uppercase;">Valor Liberado</div>
-                  <div style="font-size: 18px; font-weight: 900; color: #0ea5e9;">${formatCurrency(point.contract_value)}</div>
+              <div style="margin-bottom: 20px;">
+                <div style="font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.05em;">Objeto do Investimento</div>
+                <strong style="color: white; font-size: 15px; line-height: 1.4; display: block; margin-bottom: 12px; font-weight: 700;">${point.description_detailed}</strong>
+                
+                <div style="background: rgba(255,255,255,0.05); padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+                  <div style="font-size: 9px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px;">Favorecido</div>
+                  <div style="font-size: 13px; font-weight: 800; color: white; line-height: 1.2;">${point.company_name}</div>
+                  <div style="font-size: 10px; color: #64748b; margin-top: 4px; font-family: monospace;">CNPJ: ${point.beneficiary_id}</div>
                 </div>
               </div>
 
-              <a href="${point.portal_link}" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 15px; padding: 10px; background: #0f172a; color: white; border-radius: 8px; font-size: 11px; font-weight: 700; text-decoration: none; transition: opacity 0.2s;">
-                 ABRIR NO PORTAL DA TRANSPARÊNCIA
+              <div style="margin-bottom: 20px; padding-left: 4px;">
+                <div style="margin-bottom: 12px;">
+                  <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Localização</div>
+                  <div style="font-size: 12px; font-weight: 600; color: #e2e8f0; display: flex; align-items: flex-start; gap: 6px;">
+                    <span style="opacity: 0.7;">📍</span> ${point.address || point.district}
+                  </div>
+                </div>
+
+                <div style="background: #1e293b; padding: 16px; border-radius: 16px; border-left: 4px solid ${color};">
+                  <div style="font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; margin-bottom: 4px;">Valor Contratado</div>
+                  <div style="font-size: 24px; font-weight: 900; color: white; letter-spacing: -0.02em;">${formatCurrency(point.contract_value)}</div>
+                </div>
+              </div>
+
+              <a href="${point.portal_link}" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px; background: white; color: #0f172a; border-radius: 14px; font-size: 11px; font-weight: 900; text-decoration: none; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.05em;">
+                 Visualizar no Portal <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
               </a>
             </div>
           `)
@@ -132,61 +138,13 @@ export default function MapPanel({ points, sectors, categories, selectedSector, 
   }, [points]);
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-2xl flex flex-col lg:flex-row min-h-[600px] lg:h-[700px]">
-      <div className="w-full lg:w-96 border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col bg-slate-50/50 max-h-[400px] lg:max-h-none overflow-hidden">
-        <div className="p-4 md:p-8 border-b border-slate-200 bg-white">
-          <div className="flex items-center gap-3 md:gap-4">
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-600 rounded-xl md:rounded-2xl flex items-center justify-center text-white shadow-xl flex-shrink-0">
-              <LayoutGrid size={20} className="md:w-6 md:h-6" />
-            </div>
-            <div>
-              <h2 className="text-sm md:text-lg font-black text-slate-900 uppercase tracking-tighter">Obras e Investimentos</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Porto Alegre Transparente</p>
-            </div>
-          </div>
+    <div className="absolute inset-0 z-0">
+      <div ref={mapContainer} className="h-full w-full" />
+      {loading && (
+        <div className="absolute inset-0 z-10 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
-
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
-          <div className="p-4 md:p-6 rounded-2xl md:rounded-3xl bg-slate-900 text-white shadow-xl">
-             <div className="text-[9px] md:text-[10px] font-black opacity-60 uppercase mb-1 tracking-widest">Fontes de Dados</div>
-             <div className="text-xs md:text-sm font-bold leading-tight mb-2 md:mb-4">CGU (Federal) + TCE-RS (Estadual/Mun.)</div>
-             <div className="hidden md:block text-[10px] font-medium opacity-80 leading-relaxed">Painel consolidado de recursos aplicados em Porto Alegre, combinando dados do Portal da Transparencia e LicitaCon/TCE.</div>
-          </div>
-          
-          <div className="space-y-2">
-             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Setores Ativos</div>
-             <div className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-x-visible pb-2 lg:pb-0">
-               {sectors.map((sector) => (
-                  <button 
-                    key={sector.name} 
-                    onClick={() => onSelectSector(sector.name)} 
-                    className="flex-shrink-0 lg:w-full text-left p-3 md:p-5 rounded-2xl md:rounded-3xl bg-white border border-slate-200 hover:border-blue-500 transition-all flex items-center justify-between group gap-3"
-                  >
-                     <div className="flex items-center gap-2 md:gap-4">
-                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                          <LayoutGrid size={16} className="md:w-5 md:h-5" />
-                        </div>
-                        <span className="text-[10px] md:text-xs font-black text-slate-900 uppercase whitespace-nowrap">{sector.name}</span>
-                     </div>
-                     <ChevronRight size={16} className="text-slate-200 hidden md:block" />
-                  </button>
-               ))}
-             </div>
-          </div>
-        </div>
-
-        <div className="p-4 md:p-8 border-t border-slate-200 bg-white">
-           <div className="bg-slate-900 rounded-2xl md:rounded-[28px] p-4 md:p-6 text-white shadow-2xl">
-              <div className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase mb-1 tracking-widest">Total Identificado</div>
-              <div className="text-xl md:text-3xl font-black text-blue-400 tracking-tighter">{formatCurrency(totalVisibleValue)}</div>
-           </div>
-        </div>
-      </div>
-
-      <div className="flex-1 relative bg-slate-100 h-[400px] lg:h-auto">
-        {loading && <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-sm flex items-center justify-center"><div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>}
-        <div ref={mapContainer} className="h-full w-full" />
-      </div>
+      )}
     </div>
   );
 }

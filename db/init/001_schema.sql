@@ -11,10 +11,15 @@ CREATE TABLE IF NOT EXISTS public_expenses (
   category VARCHAR(120) NOT NULL,
   sector VARCHAR(100),
   district VARCHAR(120) NOT NULL,
-  latitude NUMERIC(9,6) NOT NULL,
-  longitude NUMERIC(9,6) NOT NULL,
+  latitude NUMERIC(9,6),
+  longitude NUMERIC(9,6),
   contract_value NUMERIC(14,2) NOT NULL,
   bidding_count INTEGER NOT NULL,
+  beneficiary_id VARCHAR(20),
+  process_number VARCHAR(100),
+  description_detailed TEXT,
+  portal_link TEXT,
+  address TEXT,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -167,4 +172,19 @@ CREATE TABLE IF NOT EXISTS portal_despesas_anuais_orgao (
   raw_payload JSONB NOT NULL,
   synced_at TIMESTAMP NOT NULL DEFAULT NOW(),
   UNIQUE (dataset_key, external_id)
+);
+
+-- 9. Cache de CNPJ (Evita excesso de chamadas em APIs externas)
+CREATE TABLE IF NOT EXISTS company_cache (
+  cnpj VARCHAR(20) PRIMARY KEY,
+  name VARCHAR(200) NOT NULL,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 10. Cache de Geolocalização
+CREATE TABLE IF NOT EXISTS geo_cache (
+  address VARCHAR(500) PRIMARY KEY,
+  latitude NUMERIC(14,10) NOT NULL,
+  longitude NUMERIC(14,10) NOT NULL,
+  updated_at TIMESTAMP DEFAULT NOW()
 );

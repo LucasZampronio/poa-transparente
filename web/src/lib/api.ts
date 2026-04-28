@@ -25,6 +25,8 @@ export type MapPoint = {
   portal_link: string;
   process_number: string;
   description_detailed: string;
+  beneficiary_id: string;
+  address?: string;
 };
 
 export type MapCategory = {
@@ -105,18 +107,49 @@ export async function fetchJson<T>(path: string, params?: Record<string, string 
   return response.json() as Promise<T>;
 }
 
-export function fetchSectors() {
-  return fetchJson<Sector[]>('/api/sectors');
+export function fetchSectors(year?: string) {
+  return fetchJson<Sector[]>('/api/sectors', year ? { year } : undefined);
 }
 
-export function fetchCategories(sector?: string) {
-  return fetchJson<MapCategory[]>('/api/categories', sector ? { sector } : undefined);
-}
-
-export function fetchMapPoints(sector?: string, categories: string[] = []) {
+export function fetchCategories(sector?: string, year?: string) {
   const params: any = {};
   if (sector) params.sector = sector;
-  if (categories.length > 0) params.category = categories;
+  if (year) params.year = year;
+  return fetchJson<MapCategory[]>('/api/categories', params);
+}
+
+export function fetchMapPoints(sector?: string, year?: string) {
+  const params: any = {};
+  if (sector) params.sector = sector;
+  if (year) params.year = year;
   
   return fetchJson<MapPoint[]>('/api/expenses/map', params);
+}
+
+export function fetchSummary(sector?: string, year?: string) {
+  const params: any = {};
+  if (sector) params.sector = sector;
+  if (year) params.year = year;
+  return fetchJson<Summary>('/api/summary', params);
+}
+
+export function fetchRankingCompanies(sector?: string, year?: string) {
+  const params: any = {};
+  if (sector) params.sector = sector;
+  if (year) params.year = year;
+  return fetchJson<RankingRow[]>('/api/rankings/companies', params);
+}
+
+export function fetchRankingAgencies(sector?: string, year?: string) {
+  const params: any = {};
+  if (sector) params.sector = sector;
+  if (year) params.year = year;
+  return fetchJson<RankingRow[]>('/api/rankings/agencies', params);
+}
+
+export function fetchTimeseries(sector?: string, year?: string) {
+  const params: any = {};
+  if (sector) params.sector = sector;
+  if (year) params.year = year;
+  return fetchJson<TimeseriesRow[]>('/api/timeseries', params);
 }

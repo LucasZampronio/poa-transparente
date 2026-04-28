@@ -2,9 +2,11 @@
 
 @theme {
   --font-sans: "Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif";
-  --color-border: hsl(214.3, 31.8%, 91.4%);
-  --color-background: #f5f7fb;
-  --color-foreground: hsl(222.2, 84%, 4.9%);
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-background: #0f1115;
+  --color-foreground: #ececed;
+  --color-accent: #3b82f6;
+  --color-panel: rgba(23, 25, 30, 0.9);
 }
 
 @layer base {
@@ -12,6 +14,38 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground font-sans antialiased overflow-hidden;
+  }
+}
+
+@layer components {
+  .pro-panel {
+    @apply bg-panel backdrop-blur-2xl border border-white/5 shadow-[0_8px_32px_rgba(0,0,0,0.5)];
+  }
+  
+  .pro-card {
+    @apply bg-white/[0.03] border border-white/5 rounded-2xl p-4 hover:bg-white/[0.06] transition-all;
+  }
+
+  .stats-value {
+    @apply text-2xl font-semibold tracking-tight text-white;
+  }
+
+  .stats-label {
+    @apply text-[10px] font-bold uppercase tracking-widest text-slate-500;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 5px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-white/10 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-white/20;
   }
 }

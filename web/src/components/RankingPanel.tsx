@@ -9,32 +9,28 @@ type Props = {
 
 export default function RankingPanel({ title, rows, labelKey, valueKey }: Props) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-      <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-        <h2 className="text-lg font-bold text-slate-800">{title}</h2>
+    <div className="flex flex-col h-full pointer-events-auto">
+      <div className="mb-4">
+        <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{title}</h2>
       </div>
-      <div className="p-0">
-        <ul className="divide-y divide-slate-100">
-          {rows.length === 0 ? (
-            <li className="p-8 text-center text-slate-400 text-sm">Nenhum dado encontrado para este ranking.</li>
-          ) : (
-            rows.map((row, idx) => (
-              <li key={`${row[labelKey]}-${idx}`} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
-                <div className="flex items-center gap-2 md:gap-3 overflow-hidden flex-1">
-                  <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 text-[10px] md:text-xs font-bold">
-                    {idx + 1}
-                  </span>
-                  <span className="text-xs md:text-sm font-medium text-slate-700 truncate group-hover:text-blue-600 transition-colors">
-                    {row[labelKey]}
-                  </span>
-                </div>
-                <strong className="text-xs md:text-sm font-black text-slate-900 ml-2 md:ml-4 tabular-nums flex-shrink-0">
+      <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+        {rows.length === 0 ? (
+          <div className="py-4 text-white/20 text-[10px] font-medium uppercase tracking-widest">No data available</div>
+        ) : (
+          rows.map((row, idx) => (
+            <div key={`${row[labelKey]}-${idx}`} className="pro-card group">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-bold text-blue-500/80 uppercase">TOP {idx + 1}</span>
+                <span className="text-[11px] font-black text-white tabular-nums">
                   {formatCurrency(row[valueKey] ?? 0)}
-                </strong>
-              </li>
-            ))
-          )}
-        </ul>
+                </span>
+              </div>
+              <div className="text-[11px] font-medium text-slate-400 truncate group-hover:text-white transition-colors uppercase tracking-tight">
+                {row[labelKey]}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

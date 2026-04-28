@@ -50,6 +50,47 @@ function mapSector(familia: string) {
   return 'URBANISMO';
 }
 
+async function getCompanyName(cnpj: string): Promise<string> {
+  if (!cnpj || cnpj === 'CNPJ OCULTO' || cnpj.length < 11) return 'CONTRATADA NAO IDENTIFICADA';
+  const cleanCnpj = cnpj.replace(/\D/g, '');
+  if (cleanCnpj === "92963560000160") return "PREFEITURA MUNICIPAL DE PORTO ALEGRE";
+
+  // Tenta buscar no cache do banco primeiro
+  try {
+    const cached = await pool.query<{ name: string }>('SELECT name FROM company_cache WHERE cnpj = $1', [cleanCnpj]);
+    if (cached.rows.length > 0) {
+      return cached.rows[0].name;
+    }
+  } catch (e) {
+    console.error('Error reading company cache:', e);
+  }
+
+  try {
+    const response = await fetch(`https://api.opencnpj.org/${cleanCnpj}`, {
+      headers: { "User-Agent": "POA-Transparente-API/1.0" }
+    });
+    if (response.ok) {
+      const data: any = await response.json();
+      const name = (data.razao_social || data.nome_fantasia || `EMPRESA (${cnpj})`).toUpperCase();
+      
+      // Salva no cache
+      try {
+        await pool.query(
+          'INSERT INTO company_cache (cnpj, name) VALUES ($1, $2) ON CONFLICT (cnpj) DO NOTHING',
+          [cleanCnpj, name]
+        );
+      } catch (e) {
+        console.error('Error saving to company cache:', e);
+      }
+      
+      return name;
+    }
+  } catch (e) {
+    console.error(`Error fetching company name for ${cnpj}:`, e);
+  }
+  return `EMPRESA (${cnpj})`;
+}
+
 export async function syncTceObras(year: number) {
   const obras = await fetchTceObras(year);
   const client = await pool.connect();
@@ -66,12 +107,14 @@ export async function syncTceObras(year: number) {
       const familia = (obra.nomesFamilias && obra.nomesFamilias[0]) || 'Obras Gerais';
       const setor = mapSector(familia);
       const numContrato = `${obra.contrato?.numeroContrato || 'S/N'}/${obra.contrato?.anoContrato || ''}`;
+      const cnpj = obra.documentoContratada || 'CNPJ OCULTO';
+      
+      const companyName = await getCompanyName(cnpj);
 
       const coords = await fetchTceCoordinates(idObra);
       
-      // Fallback simplificado (em produção usaríamos uma tabela de bairros)
-      const lat = coords?.latitude || -30.0330 + (Math.random() - 0.5) * 0.01;
-      const lng = coords?.longitude || -51.2210 + (Math.random() - 0.5) * 0.01;
+      const lat = coords?.latitude || null;
+      const lng = coords?.longitude || null;
 
       await client.query(`
         INSERT INTO public_expenses (
@@ -82,7 +125,7 @@ export async function syncTceObras(year: number) {
       `, [
         new Date(year, 0, 1),
         "PREFEITURA MUNICIPAL DE PORTO ALEGRE",
-        (obra.descricaoObjeto || 'OBRA PUBLICA').substring(0, 180).toUpperCase(),
+        companyName,
         familia.toUpperCase(),
         setor,
         bairro,
@@ -90,7 +133,7 @@ export async function syncTceObras(year: number) {
         lng,
         valorEstimado,
         1,
-        obra.documentoContratada || 'CNPJ OCULTO',
+        cnpj,
         numContrato,
         obra.descricaoObjeto || 'Sem descrição.',
         `https://compras.tce.rs.gov.br/publico/obras/${idObra}`

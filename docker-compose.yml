@@ -17,7 +17,7 @@ services:
     container_name: poa-etl
     environment:
       DATABASE_URL: postgresql://poa:poa@postgres:5432/poa_transparente
-    command: python sync_real_data.py
+    command: tail -f /dev/null
     depends_on:
       - postgres
 
