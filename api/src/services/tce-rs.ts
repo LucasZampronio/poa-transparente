@@ -122,6 +122,12 @@ export async function syncTceObras(year: number) {
           district, latitude, longitude, contract_value, bidding_count,
           beneficiary_id, process_number, description_detailed, portal_link
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        ON CONFLICT (process_number, company_name, description_detailed) 
+        DO UPDATE SET 
+          contract_value = EXCLUDED.contract_value,
+          latitude = COALESCE(EXCLUDED.latitude, public_expenses.latitude),
+          longitude = COALESCE(EXCLUDED.longitude, public_expenses.longitude),
+          portal_link = EXCLUDED.portal_link
       `, [
         new Date(year, 0, 1),
         "PREFEITURA MUNICIPAL DE PORTO ALEGRE",

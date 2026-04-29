@@ -27,6 +27,7 @@ export type MapPoint = {
   description_detailed: string;
   beneficiary_id: string;
   address?: string;
+  reference_date: string;
 };
 
 export type MapCategory = {
@@ -38,8 +39,8 @@ export type MapCategory = {
 export type RankingRow = {
   company_name?: string;
   agency?: string;
-  total_received?: string;
-  total_spent?: string;
+  total_received?: number | string;
+  total_spent?: number | string;
 };
 
 export type TimeseriesRow = {
@@ -107,49 +108,30 @@ export async function fetchJson<T>(path: string, params?: Record<string, string 
   return response.json() as Promise<T>;
 }
 
-export function fetchSectors(year?: string) {
-  return fetchJson<Sector[]>('/api/sectors', year ? { year } : undefined);
+export function fetchSectors() {
+  return fetchJson<Sector[]>('/api/sectors');
 }
 
-export function fetchCategories(sector?: string, year?: string) {
-  const params: any = {};
-  if (sector) params.sector = sector;
-  if (year) params.year = year;
-  return fetchJson<MapCategory[]>('/api/categories', params);
+export function fetchCategories() {
+  return fetchJson<MapCategory[]>('/api/categories');
 }
 
-export function fetchMapPoints(sector?: string, year?: string) {
-  const params: any = {};
-  if (sector) params.sector = sector;
-  if (year) params.year = year;
-  
-  return fetchJson<MapPoint[]>('/api/expenses/map', params);
+export function fetchMapPoints() {
+  return fetchJson<MapPoint[]>('/api/expenses/map');
 }
 
-export function fetchSummary(sector?: string, year?: string) {
-  const params: any = {};
-  if (sector) params.sector = sector;
-  if (year) params.year = year;
-  return fetchJson<Summary>('/api/summary', params);
+export function fetchSummary() {
+  return fetchJson<Summary>('/api/summary');
 }
 
-export function fetchRankingCompanies(sector?: string, year?: string) {
-  const params: any = {};
-  if (sector) params.sector = sector;
-  if (year) params.year = year;
-  return fetchJson<RankingRow[]>('/api/rankings/companies', params);
+export function fetchRankingCompanies() {
+  return fetchJson<RankingRow[]>('/api/rankings/companies');
 }
 
-export function fetchRankingAgencies(sector?: string, year?: string) {
-  const params: any = {};
-  if (sector) params.sector = sector;
-  if (year) params.year = year;
-  return fetchJson<RankingRow[]>('/api/rankings/agencies', params);
+export function fetchRankingAgencies() {
+  return fetchJson<RankingRow[]>('/api/rankings/agencies');
 }
 
-export function fetchTimeseries(sector?: string, year?: string) {
-  const params: any = {};
-  if (sector) params.sector = sector;
-  if (year) params.year = year;
-  return fetchJson<TimeseriesRow[]>('/api/timeseries', params);
+export function fetchTimeseries() {
+  return fetchJson<TimeseriesRow[]>('/api/timeseries');
 }

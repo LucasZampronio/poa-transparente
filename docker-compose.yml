@@ -29,6 +29,7 @@ services:
       PORT: 4000
       DATABASE_URL: postgresql://poa:poa@postgres:5432/poa_transparente
       PORTAL_TRANSPARENCIA_API_KEY: "04bfc25fbd6241b8adeb4b553d56e219"
+      CONECTA_GOV_TOKEN: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJsWWthcEE0Zk1ta1pET2pHTVZ3Rk5lejZrLUVwRTRVbUtJQWVTOG1vZU9BMklQV2phVS1FQnV2QXJiNlVtMnBKVDd1blYxWDI4aUJtYkhvNyIsImlhdCI6MTc3NzQyNjE4Mn0.-etnh4IYqx5U5xsGCGR-pz4BAspj-DIKMKX-l7k7MBo"
     ports:
       - "4000:4000"
     depends_on:

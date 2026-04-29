@@ -37,26 +37,44 @@ jobs:
       - name: "Try Launch Instance"
         run: |
           # Usa as variáveis de ambiente higienizadas
-          # CORREÇÃO: O campo correto é 'ocpus', não 'cpus'
+          # Construção robusta dos detalhes da VNIC e Metadata
+          VNIC_DETAILS=$(printf '{"subnetId":"%s","assignPublicIp":true,"displayName":"poa-vnic"}' "$OCI_SUBNET")
+          SHAPE_CONFIG='{"ocpus":4,"memoryInGBs":24}'
+          METADATA=$(printf '{"ssh_authorized_keys":"%s"}' "$(echo "${{ secrets.SSH_PUBLIC_KEY }}" | xargs)")
+
+          echo "Iniciando tentativa de lançamento da instância ARM..."
+          
           if oci compute instance launch \
             --availability-domain "$OCI_AD" \
             --compartment-id "$OCI_COMPARTMENT" \
             --shape "VM.Standard.A1.Flex" \
-            --shape-config '{"ocpus": 4, "memoryInGBs": 24}' \
+            --shape-config "$SHAPE_CONFIG" \
             --image-id "$OCI_IMAGE" \
-            --subnet-id "$OCI_SUBNET" \
-            --assign-public-ip true \
-            --display-name "poa-transparente-prod" \
-            --ssh-authorized-keys-file <(echo "${{ secrets.SSH_PUBLIC_KEY }}" | xargs) 2>error.log; then
+            --vnic-details "$VNIC_DETAILS" \
+            --metadata "$METADATA" \
+            --display-name "poa-transparente-prod" 2>error.log; then
             echo "Instância criada com sucesso!"
           else
             ERROR_MSG=$(cat error.log)
+            echo "Erro detectado. Analisando..."
+            
             if echo "$ERROR_MSG" | grep -iq "Out of capacity"; then
               echo "::error title=OCI Capacity Error::Sem capacidade para instâncias ARM agora. Tentando na próxima hora."
             elif echo "$ERROR_MSG" | grep -iq "NotAuthorizedOrNotFound"; then
               echo "::error title=OCI Auth Error::ID de Compartment, Imagem ou Subnet não encontrado ou sem permissão. Verifique os OCIDs e a Região."
+            elif echo "$ERROR_MSG" | grep -iq "CannotParseRequest"; then
+              echo "::error title=OCI Payload Error::Erro de formatação no request (400). Tentando rodar com --debug para diagnóstico..."
+              oci compute instance launch \
+                --availability-domain "$OCI_AD" \
+                --compartment-id "$OCI_COMPARTMENT" \
+                --shape "VM.Standard.A1.Flex" \
+                --shape-config "$SHAPE_CONFIG" \
+                --image-id "$OCI_IMAGE" \
+                --vnic-details "$VNIC_DETAILS" \
+                --metadata "$METADATA" \
+                --display-name "poa-transparente-prod" --debug || true
             else
-              echo "::error title=OCI CLI Error::Erro 400 ou similar. Verifique os parâmetros. Detalhes: $ERROR_MSG"
+              echo "::error title=OCI CLI Error::Erro desconhecido. Detalhes: $ERROR_MSG"
             fi
             exit 0
           fi
