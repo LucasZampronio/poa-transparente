@@ -20,85 +20,127 @@ import {
 import { cn } from './lib/utils';
 import { Activity, ShieldCheck, Globe, Database, Filter, BarChart3, Info } from 'lucide-react';
 
-const AVAILABLE_YEARS = ['2026', '2025', '2024', '2023', '2022'];
+const AVAILABLE_YEARS = ['ALL', '2026', '2025', '2024', '2023', '2022'];
 
 export default function App() {
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [sectors, setSectors] = useState<Sector[]>([]);
-  const [mapPoints, setMapPoints] = useState<MapPoint[]>([]);
-  const [mapCategories, setMapCategories] = useState<MapCategory[]>([]);
-  const [companies, setCompanies] = useState<RankingRow[]>([]);
-  const [agencies, setAgencies] = useState<RankingRow[]>([]);
-  const [timeseries, setTimeseries] = useState<TimeseriesRow[]>([]);
-  
-  const [selectedYear, setSelectedYear] = useState<string>(AVAILABLE_YEARS[0]);
+  const [allMapPoints, setAllMapPoints] = useState<MapPoint[]>([]);
+  const [selectedYear, setSelectedYear] = useState<string>('ALL');
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   
   const [loading, setLoading] = useState(true);
-  const [mapLoading, setMapLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // CARGA INICIAL: Busca tudo uma única vez
   useEffect(() => {
-    async function updateData() {
-      if (!loading) setMapLoading(true);
+    async function initData() {
+      console.log("🚀 Iniciando carga de dados...");
       try {
-        const [summaryData, sectorsData, mapData, categoriesData, comp, agen, time] = await Promise.all([
-          fetchSummary(selectedSector || undefined, selectedYear),
-          fetchSectors(selectedYear),
-          fetchMapPoints(selectedSector || undefined, selectedYear),
-          fetchCategories(selectedSector || undefined, selectedYear),
-          fetchRankingCompanies(selectedSector || undefined, selectedYear),
-          fetchRankingAgencies(selectedSector || undefined, selectedYear),
-          fetchTimeseries(selectedSector || undefined, selectedYear),
-        ]);
-
-        setSummary(summaryData);
-        setSectors(sectorsData);
-        setMapPoints(mapData);
-        setMapCategories(categoriesData);
-        setCompanies(comp);
-        setAgencies(agen);
-        setTimeseries(time);
+        const data = await fetchMapPoints();
+        console.log(`✅ Recebidas ${data.length} obras da API.`);
+        setAllMapPoints(data);
       } catch (e) {
+        console.error("❌ Erro na carga:", e);
         setError((e as Error).message);
       } finally {
         setLoading(false);
-        setMapLoading(false);
       }
     }
-    updateData();
-  }, [selectedYear, selectedSector]);
+    initData();
+  }, []);
+
+  // LÓGICA DE FILTRAGEM
+  const filteredData = useMemo(() => {
+    let points = Array.isArray(allMapPoints) ? allMapPoints : [];
+
+    if (selectedYear !== 'ALL') {
+      points = points.filter(p => String(p.reference_date || '').includes(selectedYear));
+    }
+
+    if (selectedSector) {
+      points = points.filter(p => p.sector === selectedSector);
+    }
+    
+    console.log(`📍 Renderizando ${points.length} pontos no mapa.`);
+
+    // Calcula Resumo (KPIs)
+    const totalSpent = points.reduce((acc, p) => acc + Number(p.contract_value), 0);
+    const uniqueCompanies = new Set(points.map(p => p.company_name)).size;
+    const uniqueAgencies = new Set(points.map(p => p.agency)).size;
+
+    // Calcula Rankings (Empresas)
+    const companyMap: Record<string, number> = {};
+    points.forEach(p => {
+      companyMap[p.company_name] = (companyMap[p.company_name] || 0) + Number(p.contract_value);
+    });
+    const topCompanies = Object.entries(companyMap)
+      .map(([name, value]) => ({ company_name: name, total_received: value }))
+      .sort((a, b) => Number(b.total_received) - Number(a.total_received))
+      .slice(0, 10);
+
+    // Calcula Rankings (Órgãos)
+    const agencyMap: Record<string, number> = {};
+    points.forEach(p => {
+      agencyMap[p.agency] = (agencyMap[p.agency] || 0) + Number(p.contract_value);
+    });
+    const topAgencies = Object.entries(agencyMap)
+      .map(([name, value]) => ({ agency: name, total_spent: value }))
+      .sort((a, b) => Number(b.total_spent) - Number(a.total_spent))
+      .slice(0, 10);
+
+    // Calcula Lista de Setores (para o menu lateral)
+    // Usamos allMapPoints (ou filtrado apenas por ano) para o menu não sumir
+    const sectorSource = selectedYear === 'ALL' ? allMapPoints : allMapPoints.filter(p => p.reference_date.startsWith(selectedYear));
+    const sectorMap: Record<string, { count: number, total: number }> = {};
+    sectorSource.forEach(p => {
+      if (!sectorMap[p.sector]) sectorMap[p.sector] = { count: 0, total: 0 };
+      sectorMap[p.sector].count++;
+      sectorMap[p.sector].total += Number(p.contract_value);
+    });
+    const sectorList = Object.entries(sectorMap).map(([name, stat]) => ({
+      name,
+      count: stat.count,
+      total: String(stat.total)
+    })).sort((a, b) => Number(b.total) - Number(a.total));
+
+    return {
+      points,
+      summary: {
+        total_spent: String(totalSpent),
+        contracts_count: String(points.length),
+        companies_count: String(uniqueCompanies),
+        agencies_count: String(uniqueAgencies)
+      },
+      topCompanies,
+      topAgencies,
+      sectorList
+    };
+  }, [allMapPoints, selectedYear, selectedSector]);
 
   return (
     <div className="relative h-screen w-screen bg-[#0a0b0d] overflow-hidden font-sans select-none text-slate-200">
-      {/* BACKGROUND LAYER: MAP */}
       <MapPanel
-        points={mapPoints}
-        sectors={sectors}
-        categories={mapCategories}
+        points={filteredData.points}
+        sectors={filteredData.sectorList}
+        categories={[]}
         selectedSector={selectedSector}
         selectedCategories={[]}
-        loading={mapLoading}
+        loading={false}
         onSelectSector={setSelectedSector}
         onToggleCategory={() => {}}
       />
 
-      {/* UI OVERLAY */}
       <div className="absolute inset-0 pointer-events-none flex flex-col z-10">
-        
-        {/* TOP BAR: SEARCH & CONTROLS */}
         <header className="h-16 border-b border-white/5 bg-[#0f1115]/80 backdrop-blur-md flex items-center justify-between px-6 pointer-events-auto">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Database size={18} className="text-white" />
               </div>
-              <h1 className="text-sm font-black uppercase tracking-tighter text-white">POA_Transparency</h1>
+              <h1 className="text-sm font-black uppercase tracking-tighter text-white">POA Transparente</h1>
             </div>
             
             <div className="h-6 w-px bg-white/10" />
 
-            {/* YEAR SELECTOR */}
             <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
               {AVAILABLE_YEARS.map((year) => (
                 <button
@@ -109,21 +151,20 @@ export default function App() {
                     selectedYear === year ? "bg-white text-black shadow-lg" : "text-slate-500 hover:text-slate-300"
                   )}
                 >
-                  {year}
+                  {year === 'ALL' ? 'TODOS' : year}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* TOP KPIs */}
           <div className="flex items-center gap-8">
             <div className="text-right">
-              <div className="stats-label">Total Invested</div>
-              <div className="text-sm font-black text-white">{summary ? formatCurrency(summary.total_spent) : 'R$ 0,00'}</div>
+              <div className="stats-label">Total Investido</div>
+              <div className="text-sm font-black text-white">{formatCurrency(filteredData.summary.total_spent)}</div>
             </div>
             <div className="text-right">
-              <div className="stats-label">Active Contracts</div>
-              <div className="text-sm font-black text-white">{summary?.contracts_count || 0}</div>
+              <div className="stats-label">Contratos Ativos</div>
+              <div className="text-sm font-black text-white">{filteredData.summary.contracts_count}</div>
             </div>
             <button className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all text-slate-400">
               <Info size={18} />
@@ -131,18 +172,15 @@ export default function App() {
           </div>
         </header>
 
-        {/* MAIN CONTENT AREA (FLOATING PANELS) */}
         <div className="flex-1 flex justify-between p-6 overflow-hidden">
-          
-          {/* LEFT SIDEBAR: FILTERS */}
           <aside className="w-72 flex flex-col gap-6">
             <div className="pro-panel p-6 rounded-3xl pointer-events-auto flex flex-col">
               <div className="flex items-center gap-2 mb-6">
                 <Filter size={14} className="text-blue-500" />
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Market Layers</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Camadas de Mercado</span>
               </div>
 
-              <nav className="space-y-1.5">
+              <nav className="space-y-1.5 overflow-y-auto no-scrollbar max-h-[60vh]">
                 <button 
                   onClick={() => setSelectedSector(null)}
                   className={cn(
@@ -150,9 +188,9 @@ export default function App() {
                     selectedSector === null ? "bg-white text-black shadow-xl" : "bg-white/5 text-slate-400 hover:bg-white/10"
                   )}
                 >
-                  All Sectors
+                  Todos os Setores
                 </button>
-                {sectors.map((s) => (
+                {filteredData.sectorList.map((s) => (
                   <button
                     key={s.name}
                     onClick={() => setSelectedSector(s.name)}
@@ -167,64 +205,47 @@ export default function App() {
               </nav>
 
               <div className="mt-8 pt-8 border-t border-white/5">
-                <div className="stats-label mb-2">Live Status</div>
+                <div className="stats-label mb-2">Saúde do Dataset</div>
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                  <span className="text-[10px] font-bold text-slate-300">Syncing with TCE-RS</span>
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-[10px] font-bold text-slate-300">Cache Local: {allMapPoints.length} obras</span>
                 </div>
               </div>
             </div>
           </aside>
 
-          {/* RIGHT SIDEBAR: ANALYTICS */}
           <aside className="w-80 flex flex-col gap-6">
             <div className="pro-panel flex-1 rounded-[32px] p-6 pointer-events-auto overflow-hidden flex flex-col">
               <div className="flex items-center gap-2 mb-6">
                 <BarChart3 size={14} className="text-blue-500" />
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Market Trends</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Tendências</span>
               </div>
               
               <div className="flex-1 overflow-y-auto space-y-8 no-scrollbar">
                 <RankingPanel 
-                  title="Top Agencies"
-                  rows={agencies}
+                  title="Principais Órgãos"
+                  rows={filteredData.topAgencies}
                   labelKey="agency"
                   valueKey="total_spent"
                 />
                 <RankingPanel 
-                  title="Top Beneficiaries"
-                  rows={companies}
+                  title="Principais Beneficiários"
+                  rows={filteredData.topCompanies}
                   labelKey="company_name"
                   valueKey="total_received"
                 />
               </div>
             </div>
-            
-            {/* INSIGHT CARD */}
-            <div className="pro-panel p-6 rounded-3xl pointer-events-auto bg-blue-600 text-white shadow-blue-900/20">
-              <div className="flex items-center gap-2 mb-3">
-                <Activity size={16} />
-                <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Insight</span>
-              </div>
-              <p className="text-[11px] font-bold leading-relaxed mb-4">
-                The current trend shows a 14% increase in public infrastructure investments compared to the previous cycle.
-              </p>
-              <button className="w-full py-3 bg-white text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg">
-                View Full Report
-              </button>
-            </div>
           </aside>
         </div>
-
       </div>
 
-      {/* LOADING OVERLAY */}
       {loading && (
         <div className="absolute inset-0 z-50 bg-[#0f1115] flex flex-col items-center justify-center gap-8">
           <div className="w-12 h-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
           <div className="text-center">
-            <h2 className="text-sm font-black text-white uppercase tracking-[0.4em]">Initializing_Protocol</h2>
-            <p className="text-[10px] font-bold text-slate-500 uppercase mt-2">Loading financial spatial data...</p>
+            <h2 className="text-sm font-black text-white uppercase tracking-[0.4em]">Iniciando Protocolo</h2>
+            <p className="text-[10px] font-bold text-slate-500 uppercase mt-2">Carregando dados financeiros...</p>
           </div>
         </div>
       )}
