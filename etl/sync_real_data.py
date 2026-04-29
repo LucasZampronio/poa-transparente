@@ -145,20 +145,31 @@ def get_coords_from_address(address):
     return None
 
 def sync_tce_obras():
-    print("--- INICIANDO SYNC CARGA TOTAL V2 ---")
+    print("--- 🚀 INICIANDO SYNC CARGA TOTAL V2 ---")
     load_caches()
     
     try:
         all_works = []
-        # Processa anos recentes primeiro para alimentar a UI
+        seen_works = set()
         for year in [2026, 2025, 2024, 2023, 2022]:
+            print(f"📡 Buscando obras de {year}...")
             works = get_works(year)
-            all_works.extend(works)
+            print(f"✅ Encontradas {len(works)} obras em {year}.")
+            for w in works:
+                id_obra = w.get('idObra')
+                if id_obra not in seen_works:
+                    all_works.append(w)
+                    seen_works.add(id_obra)
+                else:
+                    # Debug: print repeated ID
+                    pass
             
         total_works = len(all_works)
-        print(f"Enriquecendo {total_works} obras...")
+        print(f"📦 Total de obras únicas: {len(seen_works)}")
+        print(f"📦 Total de obras na lista: {len(all_works)}")
+        print(f"📦 Total de obras para processar: {total_works}")
+        print("🧹 Limpando tabela de gastos antigos...")
 
-        # Limpa o banco no inicio
         with psycopg2.connect(DATABASE_URL) as conn:
             with conn.cursor() as cur:
                 cur.execute("TRUNCATE TABLE public_expenses RESTART IDENTITY")
@@ -171,9 +182,17 @@ def sync_tce_obras():
                 beneficiary_id, process_number, description_detailed, portal_link,
                 address
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (process_number, company_name, description_detailed) 
+            DO UPDATE SET 
+                contract_value = EXCLUDED.contract_value,
+                latitude = COALESCE(EXCLUDED.latitude, public_expenses.latitude),
+                longitude = COALESCE(EXCLUDED.longitude, public_expenses.longitude),
+                portal_link = EXCLUDED.portal_link,
+                address = COALESCE(EXCLUDED.address, public_expenses.address)
         """
 
         batch = []
+        geocoded_count = 0
         for i, work in enumerate(all_works):
             id_obra = work.get('idObra')
             localizacao = work.get('localizacao', {})
@@ -183,18 +202,26 @@ def sync_tce_obras():
             
             cnpj_raw = str(work.get('documentoContratada', ''))
             nome_empresa = get_company_name(cnpj_raw)
-            descricao_objeto = smart_clean(work.get('descricaoObjeto', 'OBRA PUBLICA'))
             
             coords = get_coordinates(id_obra)
-            if not coords and full_address != "PORTO ALEGRE":
-                coords = get_coords_from_address(full_address)
-                # Se foi cache, nao precisa de sleep longo. Se foi API, dorme mais.
-                if full_address not in GEO_CACHE:
-                    time.sleep(1.2) 
+            if coords:
+                log_geo = "TCE-RS"
+            elif full_address != "PORTO ALEGRE":
+                if full_address in GEO_CACHE:
+                    coords = GEO_CACHE[full_address]
+                    log_geo = "CACHE"
+                else:
+                    coords = get_coords_from_address(full_address)
+                    log_geo = "NOMINATIM"
+                    if not GEO_CACHE: time.sleep(1.0) # Rate limit do Nominatim
+            else:
+                coords = None
+                log_geo = "NULO"
 
+            if coords: geocoded_count += 1
             lat, lng = coords if coords else (None, None)
-            valor = float(work.get('valorGarantiaObra', 0)) * 20
             
+            valor = float(work.get('valorGarantiaObra', 0)) * 20
             familias = work.get('nomesFamilias', [])
             familia = familias[0] if familias else 'Obras Gerais'
             num_proc = f"{work.get('contrato', {}).get('numeroContrato', 'S/N')}/{work.get('contrato', {}).get('anoContrato', '')}"
@@ -212,17 +239,17 @@ def sync_tce_obras():
                 1,
                 cnpj_raw,
                 num_proc,
-                descricao_objeto,
+                smart_clean(work.get('descricaoObjeto', 'OBRA PUBLICA')),
                 f"https://compras.tce.rs.gov.br/publico/obras/{id_obra}",
                 full_address
             ))
 
-            if len(batch) >= 10:
+            if len(batch) >= 20:
                 with psycopg2.connect(DATABASE_URL) as conn:
                     with conn.cursor() as cur:
                         cur.executemany(insert_query, batch)
                     conn.commit()
-                print(f"Progresso: {i + 1}/{total_works} obras inseridas.")
+                print(f"📑 Progresso: {i + 1}/{total_works} | Geo: {log_geo} | Coordenadas: {geocoded_count}/{i+1}")
                 batch = []
 
         if batch:
@@ -231,7 +258,9 @@ def sync_tce_obras():
                     cur.executemany(insert_query, batch)
                 conn.commit()
 
-        print(f"--- SYNC V2 FINALIZADO COM SUCESSO! ---")
+        print(f"--- ✨ SYNC FINALIZADO! Total: {total_works} | Com Mapa: {geocoded_count} ---")
+    except Exception as e:
+        print(f"❌ Erro crítico no ETL: {e}")
     except Exception as e:
         print(f"Erro: {e}")
 

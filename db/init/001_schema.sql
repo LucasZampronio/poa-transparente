@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS public_expenses (
   description_detailed TEXT,
   portal_link TEXT,
   address TEXT,
-  created_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (process_number, company_name, description_detailed)
 );
 
 CREATE INDEX IF NOT EXISTS idx_public_expenses_reference_date ON public_expenses(reference_date);
