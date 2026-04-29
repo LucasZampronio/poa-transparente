@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { formatLabel, formatCurrency, type MapPoint, type Sector, type MapCategory } from '../lib/api';
+import { formatLabel, formatCurrency, type MapPoint, type Sector, type MapCategory } from '../services/api';
 
 type MapPanelProps = {
   points: MapPoint[];
@@ -24,6 +24,7 @@ const ICONS: Record<string, string> = {
   'CULTURA': '<path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/><path d="M12 12v10"/><path d="m16 16-4-4-4 4"/>',
   'HABITACAO': '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
   'ADMINISTRACAO': '<rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+  'CONVENIO FEDERAL': '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
   'DEFAULT': '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>'
 };
 
@@ -37,6 +38,7 @@ const sectorThemes: Record<string, string> = {
   'CULTURA': '#ec4899',
   'HABITACAO': '#14b8a6',
   'ADMINISTRACAO': '#f59e0b',
+  'CONVENIO FEDERAL': '#0ea5e9',
   'DEFAULT': '#94a3b8'
 };
 
@@ -55,8 +57,7 @@ export default function MapPanel({ points, loading, selectedSector }: MapPanelPr
       container: mapContainer.current,
       style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
       center: [-51.21, -30.03],
-      zoom: 11,
-      antialias: true
+      zoom: 11
     });
 
     popup.current = new maplibregl.Popup({ 

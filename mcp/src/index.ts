@@ -89,19 +89,19 @@ server.tool(
 // Ferramenta: Buscar Gastos por Bairro
 server.tool(
   "buscar_gastos_por_bairro",
-  "Consulta no banco de dados os gastos públicos em um bairro específico",
+  "Consulta na camada GOLD os gastos públicos agregados em um bairro específico",
   { bairro: z.string() },
   async ({ bairro }) => {
     try {
       const result = await pool.query(
-        'SELECT agency, company_name, category, contract_value, reference_date FROM public_expenses WHERE district ILIKE $1 LIMIT 10',
+        'SELECT bairro, total_gasto, quantidade_obras FROM gold_gastos_por_bairro WHERE bairro ILIKE $1',
         [`%${bairro}%`]
       );
-      if (result.rows.length === 0) return { content: [{ type: "text", text: "Nada encontrado." }] };
-      const formatted = result.rows.map(r => `- ${r.agency}: R$ ${r.contract_value}`).join('\n');
-      return { content: [{ type: "text", text: `Dados brutos para análise:\n${formatted}` }] };
+      if (result.rows.length === 0) return { content: [{ type: "text", text: "Nenhum dado analítico encontrado para este bairro." }] };
+      const r = result.rows[0];
+      return { content: [{ type: "text", text: `Análise Gold para ${r.bairro}:\n- Total Gasto: R$ ${r.total_gasto}\n- Quantidade de Obras: ${r.quantidade_obras}` }] };
     } catch (e) {
-      return { content: [{ type: "text", text: "Erro na query." }] };
+      return { content: [{ type: "text", text: "Erro na query analítica." }] };
     }
   }
 );
@@ -174,25 +174,25 @@ server.tool(
 // Ferramenta: Verificar Duplicatas
 server.tool(
   "verificar_duplicatas",
-  "Verifica se existem obras duplicadas no banco de dados com base no número do processo, empresa e descrição.",
+  "Verifica se existem obras duplicadas na camada SILVER (TCE-RS).",
   {},
   async () => {
     try {
       const result = await pool.query(`
-        SELECT process_number, company_name, COUNT(*) 
-        FROM public_expenses 
-        GROUP BY process_number, company_name, description_detailed 
+        SELECT external_id, nome_obra, COUNT(*) 
+        FROM silver_obras 
+        GROUP BY external_id, nome_obra
         HAVING COUNT(*) > 1
       `);
       
       if (result.rows.length === 0) {
-        return { content: [{ type: "text", text: "✅ Nenhuma duplicata encontrada. A integridade dos dados está garantida!" }] };
+        return { content: [{ type: "text", text: "✅ Nenhuma duplicata encontrada na camada Silver. A integridade dos dados está garantida!" }] };
       }
 
-      const formatted = result.rows.map(r => `- Processo: ${r.process_number} | Empresa: ${r.company_name} | Qtd: ${r.count}`).join('\n');
-      return { content: [{ type: "text", text: `⚠️ Alerta de Integridade! Encontradas duplicatas:\n${formatted}` }] };
+      const formatted = result.rows.map(r => `- ID Externo: ${r.external_id} | Obra: ${r.nome_obra} | Qtd: ${r.count}`).join('\n');
+      return { content: [{ type: "text", text: `⚠️ Alerta de Integridade! Encontradas duplicatas na Silver:\n${formatted}` }] };
     } catch (e) {
-      return { content: [{ type: "text", text: "Erro ao consultar duplicatas no banco." }] };
+      return { content: [{ type: "text", text: "Erro ao consultar duplicatas na camada Silver." }] };
     }
   }
 );

@@ -1,4 +1,4 @@
-import { formatCurrency, type TimeseriesRow } from '../lib/api';
+import { formatCurrency, type TimeseriesRow } from '../services/api';
 
 type Props = {
   rows: TimeseriesRow[];

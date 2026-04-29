@@ -316,32 +316,30 @@ function toNumber(value: unknown) {
 }
 
 async function getCategoryOverview(category: string): Promise<CategoryOverview> {
+  // Nota: Como agora usamos Gold tables, a categoria 'Obra Pública' é a base.
+  // Filtros por categoria específica (Saúde, Educação) exigirão tags na Silver no futuro.
   const overviewResult = await pool.query(
     `
       SELECT
-        COALESCE(SUM(contract_value), 0) AS total_spent,
+        COALESCE(SUM(valor_total_gasto), 0) AS total_spent,
         COUNT(*)::int AS contracts_count,
-        COUNT(DISTINCT agency)::int AS agencies_count,
-        COUNT(DISTINCT company_name)::int AS companies_count,
-        COUNT(DISTINCT district)::int AS districts_count,
-        COALESCE(AVG(contract_value), 0) AS avg_contract_value,
-        COALESCE(SUM(bidding_count), 0)::int AS bidding_volume
-      FROM public_expenses
-      WHERE category = $1
-    `,
-    [category]
+        (SELECT COUNT(DISTINCT orgao) FROM silver_obras)::int AS agencies_count,
+        (SELECT COUNT(*) FROM gold_top_empresas)::int AS companies_count,
+        (SELECT COUNT(*) FROM gold_gastos_por_bairro)::int AS districts_count,
+        COALESCE(AVG(valor_total_gasto), 0) AS avg_contract_value,
+        COALESCE(SUM(quantidade_despesas), 0)::int AS bidding_volume
+      FROM gold_obras_com_gastos
+    `
   );
 
   const topAgencyResult = await pool.query<TopAgencyRow>(
     `
-      SELECT agency, ROUND(SUM(contract_value)::numeric, 2) AS total_spent
-      FROM public_expenses
-      WHERE category = $1
-      GROUP BY agency
+      SELECT orgao as agency, ROUND(SUM(valor_licitado)::numeric, 2) AS total_spent
+      FROM silver_obras
+      GROUP BY orgao
       ORDER BY total_spent DESC
       LIMIT 1
-    `,
-    [category]
+    `
   );
 
   const overviewRow = overviewResult.rows[0] ?? {};
@@ -364,16 +362,13 @@ async function getTerritorialBreakdown(category: string) {
   const result = await pool.query<TerritorialBreakdownRow>(
     `
       SELECT
-        district,
-        COUNT(*)::int AS contracts_count,
-        ROUND(SUM(contract_value)::numeric, 2) AS total_spent
-      FROM public_expenses
-      WHERE category = $1
-      GROUP BY district
+        bairro as district,
+        quantidade_obras AS contracts_count,
+        ROUND(total_gasto::numeric, 2) AS total_spent
+      FROM gold_gastos_por_bairro
       ORDER BY total_spent DESC
       LIMIT 6
-    `,
-    [category]
+    `
   );
 
   return result.rows.map((row) => ({
@@ -386,14 +381,11 @@ async function getTerritorialBreakdown(category: string) {
 async function getTopCompanies(category: string) {
   const result = await pool.query<CompanyBreakdownRow>(
     `
-      SELECT company_name, ROUND(SUM(contract_value)::numeric, 2) AS total_received
-      FROM public_expenses
-      WHERE category = $1
-      GROUP BY company_name
+      SELECT empresa as company_name, ROUND(total_recebido::numeric, 2) AS total_received
+      FROM gold_top_empresas
       ORDER BY total_received DESC
       LIMIT 5
-    `,
-    [category]
+    `
   );
 
   return result.rows.map((row) => ({
@@ -406,12 +398,11 @@ async function getMonthlySeries(category: string) {
   const result = await pool.query<MonthlySeriesRow>(
     `
       SELECT
-        TO_CHAR(DATE_TRUNC('month', reference_date), 'YYYY-MM') AS month,
-        ROUND(SUM(contract_value)::numeric, 2) AS total_spent
-      FROM public_expenses
-      WHERE category = $1
-      GROUP BY DATE_TRUNC('month', reference_date)
-      ORDER BY DATE_TRUNC('month', reference_date)
+        TO_CHAR(data, 'YYYY-MM') AS month,
+        ROUND(SUM(total_gasto)::numeric, 2) AS total_spent
+      FROM gold_series_temporais
+      GROUP BY DATE_TRUNC('month', data)
+      ORDER BY DATE_TRUNC('month', data)
     `,
     [category]
   );

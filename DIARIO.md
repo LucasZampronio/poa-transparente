@@ -20,3 +20,16 @@ Criação de uma stack de automação para provisionamento de VM ARM Always Free
 
 ### 🎓 O que aprendi hoje:
 Como gerenciar credenciais de nuvem de forma segura usando GitHub Secrets e como automatizar a infraestrutura (IaC) para lidar com limitações de recursos gratuitos em provedores de cloud.
+
+---
+
+## 📅 29/04/2026
+### 📝 O que fizemos:
+Restauração completa do ciclo de build do projeto. Corrigimos erros críticos de sincronização entre API e Banco de Dados, além de refatorar o Frontend para alinhar importações e tipagens.
+
+### 💡 Decisões de Software (Papo de Senior):
+**Integridade End-to-End:** Ao identificar uma propriedade faltando no repositório da API, não apenas adicionamos o código, mas garantimos que a fonte de dados (Gold Layer) e o processamento (ETL) estivessem preparados para sustentar essa nova funcionalidade de forma performática. No Frontend, priorizamos a **Tipagem Explícita** para garantir a robustez do compilador TS.
+
+### 🎓 O que aprendi hoje:
+A importância de manter a consistência entre camadas (Repository -> Service -> Controller) e como uma falha de importação no Frontend pode paralisar um pipeline de CI/CD se não houver auditoria constante de tipos.
+

@@ -52,6 +52,39 @@ export type BolsaFamiliaResponse = {
   quantidadeBeneficiados: number;
 };
 
+export type ConvenioResponse = {
+  id: number;
+  numeroConvenio: string;
+  objeto: string;
+  valorCelebrado: number;
+  dataAssinatura: string;
+  situacao: string;
+  concedente: {
+    nome: string;
+    orgaoSuperior: string;
+  };
+  conveniado: {
+    nome: string;
+    cnpj: string;
+  };
+  localidade: {
+    nome: string;
+    uf: string;
+  };
+};
+
+export async function fetchConvenios(codigoIbge: string, ano: number) {
+  // A API usa dataInicial e dataFinal no formato dd/MM/yyyy
+  const params = {
+    codigoMunicipioIbge: codigoIbge,
+    dataInicial: `01/01/${ano}`,
+    dataFinal: `31/12/${ano}`,
+    pagina: 1
+  };
+  
+  return portalGet<ConvenioResponse[]>('/convenios', params);
+}
+
 export async function syncBolsaFamilia(mesAno: string, codigoIbge: string) {
   const datasetKey = 'bolsa-familia-por-municipio';
   

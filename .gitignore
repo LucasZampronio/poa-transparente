@@ -36,5 +36,8 @@ Thumbs.db
 
 # Project Specific
 tmp/
+*.json
+*.csv
+*.pdf
 TESTE.txt
 image.png

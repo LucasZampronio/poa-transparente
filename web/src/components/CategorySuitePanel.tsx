@@ -2,10 +2,10 @@ import { cn } from '../lib/utils';
 import {
   type AccessLevel,
   type CategorySuite,
-  formatCategoryLabel,
   formatCurrency,
   type SuiteIndicator,
-} from '../lib/api';
+  type IndicatorGroup,
+} from '../services/api';
 
 type Props = {
   suite: CategorySuite | null;
@@ -65,7 +65,7 @@ export default function CategorySuitePanel({ suite, selectedCategories, loading,
 
   if (!suite) return null;
 
-  const sourceMap = new Map(suite.sources.map((source) => [source.key ?? source.id, source]));
+  const sourceMap = new Map(suite.sources.map((source: any) => [source.key ?? source.id, source]));
 
   return (
     <section className="space-y-6">
@@ -106,14 +106,14 @@ export default function CategorySuitePanel({ suite, selectedCategories, loading,
         </div>
 
         <div className="p-6 space-y-8">
-          {suite.indicatorGroups.map((group) => (
+          {suite.indicatorGroups.map((group: IndicatorGroup) => (
             <div key={group.id} className="space-y-4">
               <div className="flex items-center gap-3">
                 <h3 className="text-sm font-black uppercase tracking-tighter text-slate-900 whitespace-nowrap">{group.title}</h3>
                 <div className="h-px w-full bg-slate-100" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {group.indicators.map((indicator) => (
+                {group.indicators.map((indicator: SuiteIndicator) => (
                   <div key={indicator.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/30 hover:bg-white hover:shadow-md transition-all group">
                     <div className="flex justify-between items-start mb-3">
                       <span className="text-[10px] font-black px-2 py-1 bg-slate-200 rounded text-slate-600">{indicator.dimension}</span>

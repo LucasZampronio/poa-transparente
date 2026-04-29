@@ -14,9 +14,14 @@ Este projeto foi montado para simular um cenário real de produto:
 
 ## Arquitetura
 
-- Python (`etl/`): Sincronização inteligente via **API LicitaCon (TCE-RS)** com enriquecimento de dados.
-- PostgreSQL (`db/init/`): Schema analítico com camadas Bronze/Prata e caches de geocodificação.
-- Node.js + TypeScript (`api/`): API REST integrada ao TCE-RS e ao Portal da Transparência Federal (Bolsa Família).
+- **Camadas de Dados (Medallion):**
+  - **Bronze:** Ingestão bruta de APIs externas.
+  - **Silver:** Limpeza e normalização (`silver_obras`, `silver_despesas`).
+  - **Matching:** Inteligência de cruzamento (Fuzzy matching) entre obras do TCE e despesas de POA.
+  - **Gold:** Tabelas pré-agregadas para performance analítica extrema.
+- Python (`etl/`): Sincronização inteligente via **API LicitaCon (TCE-RS)** e **Dados Abertos POA** com enriquecimento de dados.
+- PostgreSQL (`db/init/`): Schema analítico multi-camada com caches de geocodificação.
+- Node.js + TypeScript (`api/`): API REST otimizada para servir a camada **Gold**.
 - Geolocalização: Coordenadas oficiais do TCE-RS + Fallback via **Nominatim (OSM)**.
 - React + Vite + **MapLibre GL JS** (`web/`): Dashboard interativo com visualização geográfica vetorial (Dark Matter).
 - Prometheus (`monitoring/prometheus/`): Scraping de métricas de performance e negócio.
@@ -24,11 +29,11 @@ Este projeto foi montado para simular um cenário real de produto:
 
 ## Estrutura de pastas
 
-- `api/`: Serviço HTTP e integração com APIs de transparência.
+- `api/`: Serviço HTTP e integração com APIs de transparência (Node.js).
 - `web/`: Front-end React com mapas e dashboards.
-- `etl/`: Scripts de carga, limpeza e enriquecimento (TCE-RS).
+- `etl/`: Scripts de carga, matching e camada Gold (Python).
 - `mcp/`: Servidor Model Context Protocol (IA-ready).
-- `db/init/`: Scripts SQL, índices e definições de schema.
+- `db/init/`: Scripts SQL, índices e definições de schema (01_bronze, 02_silver, 03_gold).
 - `monitoring/`: Configurações de Prometheus e Grafana.
 - `terraform/`: Infraestrutura como código para Oracle Cloud.
 - `.github/workflows/`: Automação de provisionamento (OCI) e CI/CD.
@@ -130,12 +135,11 @@ significa que o cliente Docker existe, mas o engine não está ativo.
 ## Endpoints principais da API
 
 - `GET /health`
-- `GET /metrics`
-- `GET /api/summary`
-- `GET /api/expenses/map`
-- `GET /api/rankings/companies`
-- `GET /api/rankings/agencies`
-- `GET /api/timeseries`
+- `GET /api/summary`: Resumo consolidado da camada Gold.
+- `GET /api/expenses/map`: Dados geoespaciais enriquecidos para o mapa.
+- `GET /api/works/:id/expenses`: Despesas vinculadas a uma obra com score de confiança.
+- `GET /api/rankings/companies`: Top 10 empresas por recebimento.
+- `GET /api/timeseries`: Evolução temporal de gastos.
 
 Exemplo rápido:
 

@@ -1,24 +1,43 @@
 # POA Transparente - Diretrizes de Desenvolvimento
 
-## 🛠 Arquitetura de Dados e APIs
+## 🛠 Arquitetura de Dados (Medallion)
 
-### 1. Integrações Governamentais (Cuidado!)
-Existem duas fontes distintas de dados federais integradas neste projeto que NÃO devem ser confundidas:
+O projeto segue a arquitetura de medalhão para garantir rastreabilidade e performance analítica:
 
+### 1. Camada Bronze (Raw)
+- **Origem:** Dados brutos das APIs (TCE-RS, Dados Abertos POA, Portal da Transparência Federal).
+- **Armazenamento:** Tabelas `portal_transparencia_raw_records` e registros iniciais.
+
+### 2. Camada Silver (Cleansed/Typed)
+- **Tabelas:** `silver_obras`, `silver_despesas`, `silver_fornecedores`.
+- **Regra:** Dados limpos, normalizados e tipados. Deduplicação baseada em IDs externos ou chaves naturais.
+- **LEGACY:** A tabela `public_expenses` é considerada legada e não deve ser utilizada para novas funcionalidades. Ela foi substituída pelo pipeline Silver -> Matching -> Gold.
+
+### 3. Camada Matching (Linking)
+- **Tabela:** `obra_despesa_match`.
+- **Lógica:** Fuzzy matching (via `rapidfuzz`) entre o objeto da obra (TCE) e o objeto da despesa (POA).
+- **Fórmula de Score:** `(Similaridade Texto * 0.5) + (Similaridade Fornecedor * 0.3) + (Proximidade Valor * 0.2)`.
+- **Confiança:** 
+  - `Alta`: Score > 80
+  - `Média`: Score 50-80
+  - `Baixa`: Score < 50 (Geralmente ignorado em agregações Gold).
+
+### 4. Camada Gold (Analytical)
+- **Tabelas:** `gold_obras_com_gastos`, `gold_top_empresas`, `gold_gastos_por_bairro`, `gold_series_temporais`.
+- **Regra:** Apenas estas tabelas devem ser lidas pela API em endpoints analíticos. Elas são reconstruídas periodicamente pelo ETL.
+
+## 📡 Integrações Governamentais (Cuidado!)
+Existem três fontes principais:
+
+- **TCE-RS (LicitaCon Obras):**
+  - **Uso:** Cadastro oficial de obras, medições e geolocalização.
+  - **Service:** `etl/sync_evolution.py` (via API REST).
 - **Portal da Transparência (CGU):**
-  - **Uso:** Benefícios sociais (Bolsa Família, BPC), convênios e despesas federais.
+  - **Uso:** Benefícios sociais (Bolsa Família, BPC).
   - **Auth:** Header `chave-api-dados`.
-  - **Service:** `api/src/services/portal-transparencia.ts`.
-  
-- **Portal de Dados Abertos (Conecta GOV.BR):**
-  - **Uso:** Catálogo geral de datasets, Censo Escolar, Frota de Veículos, etc.
-  - **Auth:** Header `Authorization: Bearer <JWT_TOKEN>`.
-  - **Service:** `api/src/services/conecta-dados-abertos.ts`.
-
-### 2. Integridade e Idempotência (ETL)
-Todo script de ingestão de dados deve seguir o padrão de **idempotência**:
-- **Constraint Física:** A tabela `public_expenses` possui uma `UNIQUE CONSTRAINT` em `(process_number, company_name, description_detailed)`.
-- **Lógica de Carga:** Sempre utilizar `ON CONFLICT (colunas) DO UPDATE` no SQL ou filtrar IDs únicos em memória antes da inserção em batch para evitar erros de duplicidade.
+- **Portal de Dados Abertos (Porto Alegre):**
+  - **Uso:** Despesas orçamentárias (Licitacon), fornecedores.
+  - **Format:** CSV/JSON via API CKAN.
 
 ## 🎨 Padrões de UI (Mapa)
 - **Popups:** Devem utilizar o container customizado definido em `MapPanel.tsx` (estilo dark, bordas 20px, gradients de setor).

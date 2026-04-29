@@ -91,6 +91,11 @@ async function getCompanyName(cnpj: string): Promise<string> {
   return `EMPRESA (${cnpj})`;
 }
 
+/**
+ * @deprecated Esta função de sincronização direta via Node.js é considerada LEGADA.
+ * O novo pipeline de dados utiliza Python (etl/sync_evolution.py) com arquitetura Medallion
+ * e lógica de fuzzy matching entre obras e despesas.
+ */
 export async function syncTceObras(year: number) {
   const obras = await fetchTceObras(year);
   const client = await pool.connect();

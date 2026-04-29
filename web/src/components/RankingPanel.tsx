@@ -1,9 +1,9 @@
-import { formatCurrency, type RankingRow } from '../lib/api';
+import { formatCurrency, type RankingRow } from '../services/api';
 
 type Props = {
   title: string;
-  rows: RankingRow[];
-  labelKey: 'company_name' | 'agency';
+  rows: any[];
+  labelKey: 'company_name' | 'agency' | 'description';
   valueKey: 'total_received' | 'total_spent';
 };
 
