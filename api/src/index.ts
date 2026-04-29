@@ -52,7 +52,8 @@ app.get('/api/expenses/map', async (req, res) => {
   const result = await pool.query(`
     SELECT 
       district, latitude, longitude, company_name, agency, category, sector, contract_value,
-      beneficiary_id, process_number, description_detailed, portal_link, address, reference_date
+      beneficiary_id, process_number, description_detailed, portal_link, address, reference_date,
+      fiscal_name, fiscal_info, technical_family, technical_subfamily
     FROM public_expenses
     ORDER BY contract_value DESC
     LIMIT 5000

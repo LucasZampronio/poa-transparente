@@ -148,7 +148,7 @@ export default function MapPanel({ points, loading, selectedSector }: MapPanelPr
           popup.current!
             .setLngLat([lng, lat])
             .setHTML(`
-              <div class="custom-popup-content" style="padding: 0; font-family: 'Inter', sans-serif; width: 300px; background: #0f1115; color: #cbd5e1; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);">
+              <div class="custom-popup-content" style="padding: 0; font-family: 'Inter', sans-serif; width: 320px; background: #0f1115; color: #cbd5e1; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);">
                 <div style="background: linear-gradient(to bottom right, ${color}33, transparent); padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.05);">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="background: ${color}; color: white; padding: 4px 10px; border-radius: 8px; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em;">
@@ -157,14 +157,25 @@ export default function MapPanel({ points, loading, selectedSector }: MapPanelPr
                     <span style="color: #64748b; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace;">ANO_${workYear}</span>
                   </div>
                   <h3 style="color: white; font-size: 15px; line-height: 1.4; font-weight: 800; margin: 0; letter-spacing: -0.02em;">${point.description_detailed}</h3>
+                  <div style="margin-top: 8px; font-size: 10px; font-weight: 600; color: #64748b;">
+                    ${point.technical_family} <span style="opacity: 0.4;">•</span> ${point.technical_subfamily}
+                  </div>
                 </div>
 
                 <div style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
                   <div>
-                    <div style="font-size: 9px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Detalhes do Investimento</div>
+                    <div style="font-size: 9px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Execução e Fiscalização</div>
                     <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
                       <div style="font-size: 11px; font-weight: 700; color: white; margin-bottom: 2px;">${point.company_name}</div>
-                      <div style="font-size: 9px; color: #64748b; font-family: 'JetBrains Mono', monospace;">CNPJ: ${point.beneficiary_id}</div>
+                      <div style="font-size: 9px; color: #64748b; font-family: 'JetBrains Mono', monospace; margin-bottom: 8px;">CNPJ: ${point.beneficiary_id}</div>
+                      
+                      <div style="padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; gap: 8px; align-items: center;">
+                        <div style="width: 20px; height: 20px; background: ${color}22; color: ${color}; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px;">👤</div>
+                        <div>
+                          <div style="font-size: 10px; font-weight: 700; color: #e2e8f0;">Fiscal: ${point.fiscal_name || 'Não informado'}</div>
+                          <div style="font-size: 8px; color: #64748b;">${point.fiscal_info || 'Aguardando designação'}</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 

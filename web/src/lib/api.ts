@@ -28,6 +28,10 @@ export type MapPoint = {
   beneficiary_id: string;
   address?: string;
   reference_date: string;
+  fiscal_name?: string;
+  fiscal_info?: string;
+  technical_family?: string;
+  technical_subfamily?: string;
 };
 
 export type MapCategory = {
