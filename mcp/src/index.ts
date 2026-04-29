@@ -171,5 +171,31 @@ server.tool(
   }
 );
 
+// Ferramenta: Verificar Duplicatas
+server.tool(
+  "verificar_duplicatas",
+  "Verifica se existem obras duplicadas no banco de dados com base no número do processo, empresa e descrição.",
+  {},
+  async () => {
+    try {
+      const result = await pool.query(`
+        SELECT process_number, company_name, COUNT(*) 
+        FROM public_expenses 
+        GROUP BY process_number, company_name, description_detailed 
+        HAVING COUNT(*) > 1
+      `);
+      
+      if (result.rows.length === 0) {
+        return { content: [{ type: "text", text: "✅ Nenhuma duplicata encontrada. A integridade dos dados está garantida!" }] };
+      }
+
+      const formatted = result.rows.map(r => `- Processo: ${r.process_number} | Empresa: ${r.company_name} | Qtd: ${r.count}`).join('\n');
+      return { content: [{ type: "text", text: `⚠️ Alerta de Integridade! Encontradas duplicatas:\n${formatted}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: "Erro ao consultar duplicatas no banco." }] };
+    }
+  }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
