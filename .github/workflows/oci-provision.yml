@@ -22,6 +22,7 @@ jobs:
           echo "OCI_CLI_FINGERPRINT=$(echo "${{ secrets.OCI_FINGERPRINT }}" | tr -d '\r\n ')" >> $GITHUB_ENV
           echo "OCI_CLI_REGION=$(echo "${{ secrets.OCI_REGION }}" | tr -d '\r\n ')" >> $GITHUB_ENV
           echo "OCI_COMPARTMENT=$(echo "${{ secrets.OCI_COMPARTMENT_OCID }}" | tr -d '\r\n ')" >> $GITHUB_ENV
+          echo "OCI_SUBNET_SECRET=$(echo "${{ secrets.OCI_SUBNET_OCID }}" | tr -d '\r\n ')" >> $GITHUB_ENV
 
       - name: Setup OCI CLI
         uses: oracle-actions/run-oci-cli-command@v1.3.2
@@ -45,15 +46,22 @@ jobs:
           echo "Imagem Encontrada: $IMAGE_ID"
           echo "OCI_IMAGE=$IMAGE_ID" >> $GITHUB_ENV
 
-          SUBNET_ID=$(oci network subnet list --compartment-id "$OCI_COMPARTMENT" \
-            --query "data[?prohibitPublicIpOnVnic==\`false\`].id | [0]" --raw-output)
-          
-          if [ -z "$SUBNET_ID" ] || [ "$SUBNET_ID" == "null" ]; then
-            echo "::error::Não foi possível encontrar uma Subnet Pública. Verifique sua rede."
-            exit 1
+          # Tenta usar o secret primeiro, se não existir, tenta descobrir
+          if [ -n "$OCI_SUBNET_SECRET" ]; then
+            echo "Usando Subnet configurada via Secret: $OCI_SUBNET_SECRET"
+            echo "OCI_SUBNET=$OCI_SUBNET_SECRET" >> $GITHUB_ENV
+          else
+            echo "Secret OCI_SUBNET_OCID não encontrado. Tentando auto-descoberta..."
+            SUBNET_ID=$(oci network subnet list --compartment-id "$OCI_COMPARTMENT" \
+              --query "data[?prohibitPublicIpOnVnic==\`false\`].id | [0]" --raw-output)
+            
+            if [ -z "$SUBNET_ID" ] || [ "$SUBNET_ID" == "null" ]; then
+              echo "::error::Não foi possível encontrar uma Subnet Pública (via Secret ou Auto-Descoberta). Verifique sua rede na OCI."
+              exit 1
+            fi
+            echo "Subnet Encontrada via Auto-Descoberta: $SUBNET_ID"
+            echo "OCI_SUBNET=$SUBNET_ID" >> $GITHUB_ENV
           fi
-          echo "Subnet Encontrada: $SUBNET_ID"
-          echo "OCI_SUBNET=$SUBNET_ID" >> $GITHUB_ENV
 
       - name: "Try Launch Instance"
         run: |
