@@ -17,64 +17,68 @@ jobs:
     steps:
       - name: "Clean OCI Secrets"
         run: |
-          # Higieniza TODOS os inputs para remover espaços, tabs ou quebras de linha invisíveis
           echo "OCI_CLI_USER=$(echo "${{ secrets.OCI_USER_OCID }}" | tr -d '\r\n ')" >> $GITHUB_ENV
           echo "OCI_CLI_TENANCY=$(echo "${{ secrets.OCI_TENANCY_OCID }}" | tr -d '\r\n ')" >> $GITHUB_ENV
           echo "OCI_CLI_FINGERPRINT=$(echo "${{ secrets.OCI_FINGERPRINT }}" | tr -d '\r\n ')" >> $GITHUB_ENV
           echo "OCI_CLI_REGION=$(echo "${{ secrets.OCI_REGION }}" | tr -d '\r\n ')" >> $GITHUB_ENV
-          
-          # Limpeza dos parâmetros de criação
-          echo "OCI_AD=$(echo "${{ secrets.OCI_AD }}" | tr -d '\r\n ')" >> $GITHUB_ENV
           echo "OCI_COMPARTMENT=$(echo "${{ secrets.OCI_COMPARTMENT_OCID }}" | tr -d '\r\n ')" >> $GITHUB_ENV
-          echo "OCI_IMAGE=$(echo "${{ secrets.OCI_IMAGE_OCID }}" | tr -d '\r\n ')" >> $GITHUB_ENV
-          echo "OCI_SUBNET=$(echo "${{ secrets.OCI_SUBNET_OCID }}" | tr -d '\r\n ')" >> $GITHUB_ENV
 
       - name: Setup OCI CLI
         uses: oracle-actions/run-oci-cli-command@v1.3.2
         with:
           command: '--version'
 
+      - name: "Auto-Discover OCI Resources"
+        run: |
+          echo "Iniciando descoberta automática de recursos..."
+          AD_NAME=$(oci iam availability-domain list --query 'data[0].name' --raw-output)
+          echo "AD Encontrado: $AD_NAME"
+          echo "OCI_AD=$AD_NAME" >> $GITHUB_ENV
+
+          IMAGE_ID=$(oci compute image list \
+            --compartment-id "$OCI_COMPARTMENT" \
+            --operating-system "Oracle Linux" \
+            --operating-system-version "9" \
+            --shape "VM.Standard.A1.Flex" \
+            --sort-by "TIMECREATED" \
+            --query 'data[0].id' --raw-output)
+          echo "Imagem Encontrada: $IMAGE_ID"
+          echo "OCI_IMAGE=$IMAGE_ID" >> $GITHUB_ENV
+
+          SUBNET_ID=$(oci network subnet list --compartment-id "$OCI_COMPARTMENT" \
+            --query "data[?prohibitPublicIpOnVnic==\`false\`].id | [0]" --raw-output)
+          
+          if [ -z "$SUBNET_ID" ] || [ "$SUBNET_ID" == "null" ]; then
+            echo "::error::Não foi possível encontrar uma Subnet Pública. Verifique sua rede."
+            exit 1
+          fi
+          echo "Subnet Encontrada: $SUBNET_ID"
+          echo "OCI_SUBNET=$SUBNET_ID" >> $GITHUB_ENV
+
       - name: "Try Launch Instance"
         run: |
-          # Usa as variáveis de ambiente higienizadas
-          # Construção robusta dos detalhes da VNIC e Metadata
-          VNIC_DETAILS=$(printf '{"subnetId":"%s","assignPublicIp":true,"displayName":"poa-vnic"}' "$OCI_SUBNET")
-          SHAPE_CONFIG='{"ocpus":4,"memoryInGBs":24}'
-          METADATA=$(printf '{"ssh_authorized_keys":"%s"}' "$(echo "${{ secrets.SSH_PUBLIC_KEY }}" | xargs)")
-
-          echo "Iniciando tentativa de lançamento da instância ARM..."
+          SSH_KEY=$(echo "${{ secrets.SSH_PUBLIC_KEY }}" | xargs)
+          echo "Tentando lançar instância ARM..."
           
           if oci compute instance launch \
             --availability-domain "$OCI_AD" \
             --compartment-id "$OCI_COMPARTMENT" \
             --shape "VM.Standard.A1.Flex" \
-            --shape-config "$SHAPE_CONFIG" \
+            --shape-config '{"ocpus":1,"memoryInGBs":6}' \
             --image-id "$OCI_IMAGE" \
-            --create-vnic-details "$VNIC_DETAILS" \
-            --metadata "$METADATA" \
+            --subnet-id "$OCI_SUBNET" \
+            --assign-public-ip true \
+            --metadata "{\"ssh_authorized_keys\":\"$SSH_KEY\"}" \
             --display-name "poa-transparente-prod" 2>error.log; then
             echo "Instância criada com sucesso!"
           else
             ERROR_MSG=$(cat error.log)
-            echo "Erro detectado. Analisando..."
+            echo "Erro detectado: $ERROR_MSG"
             
             if echo "$ERROR_MSG" | grep -iq "Out of capacity"; then
-              echo "::error title=OCI Capacity Error::Sem capacidade para instâncias ARM agora. Tentando na próxima hora."
-            elif echo "$ERROR_MSG" | grep -iq "NotAuthorizedOrNotFound"; then
-              echo "::error title=OCI Auth Error::ID de Compartment, Imagem ou Subnet não encontrado ou sem permissão. Verifique os OCIDs e a Região."
-            elif echo "$ERROR_MSG" | grep -iq "CannotParseRequest"; then
-              echo "::error title=OCI Payload Error::Erro de formatação no request (400). Tentando rodar com --debug para diagnóstico..."
-              oci compute instance launch \
-                --availability-domain "$OCI_AD" \
-                --compartment-id "$OCI_COMPARTMENT" \
-                --shape "VM.Standard.A1.Flex" \
-                --shape-config "$SHAPE_CONFIG" \
-                --image-id "$OCI_IMAGE" \
-                --create-vnic-details "$VNIC_DETAILS" \
-                --metadata "$METADATA" \
-                --display-name "poa-transparente-prod" --debug || true
+              echo "::error title=OCI Capacity Error::Sem capacidade ARM agora. O robô tentará novamente na próxima hora."
             else
-              echo "::error title=OCI CLI Error::Erro desconhecido. Detalhes: $ERROR_MSG"
+              echo "::error title=OCI CLI Error::Falha no comando. Verifique os logs."
             fi
             exit 0
           fi
