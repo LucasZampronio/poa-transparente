@@ -193,3 +193,6 @@ Parar e remover volumes:
 ## Nota
 
 Este projeto utiliza exclusivamente dados oficiais extraídos via API do Portal de Dados Abertos de Porto Alegre (SDO 2023-2026) e do Portal da Transparência do Governo Federal (Novo Bolsa Família), garantindo uma análise fiel e auditável da gestão pública.
+
+![alt text](image-1.png)
+![alt text](image-2.png)
