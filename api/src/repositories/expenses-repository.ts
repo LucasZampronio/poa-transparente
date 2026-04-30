@@ -34,27 +34,56 @@ export const ExpensesRepository = {
 
   async getMapData() {
     const result = await pool.query(`
+      -- 1. Obras (Com ou sem gastos vinculados)
       SELECT 
         so.bairro as district, 
         so.latitude, 
         so.longitude, 
         so.descricao as description_detailed,
-        go.valor_total_gasto as contract_value,
-        'INFRAESTRUTURA' as sector, -- default sector for works
+        COALESCE(go.valor_total_gasto, 0) as contract_value,
+        'INFRAESTRUTURA' as sector,
+        'OBRA' as type,
         so.link_tce as portal_link,
-        'MÚLTIPLAS EMPRESAS' as company_name, -- Since expenses are aggregated, company name might not be single
+        COALESCE(so.contratada_nome, 'MÚLTIPLAS EMPRESAS') as company_name,
         so.orgao as agency,
         so.data_inicio as reference_date,
-        NULL as beneficiary_id,
+        so.contratada_cnpj as beneficiary_id,
         so.bairro as address,
         NULL as fiscal_name,
         NULL as fiscal_info,
         NULL as technical_family,
         NULL as technical_subfamily
-      FROM gold_obras_com_gastos go
-      JOIN silver_obras so ON go.obra_id = so.id
+      FROM silver_obras so
+      LEFT JOIN gold_obras_com_gastos go ON so.id = go.obra_id
       WHERE so.latitude IS NOT NULL AND so.longitude IS NOT NULL
-      ORDER BY so.data_inicio DESC, go.valor_total_gasto DESC
+
+      UNION ALL
+
+      -- 2. Gastos Avulsos (Despesas que não estão vinculadas a nenhuma obra)
+      SELECT 
+        'PORTO ALEGRE' as district, -- Despesas avulsas geralmente são no município
+        sd.latitude, 
+        sd.longitude, 
+        sd.descricao as description_detailed,
+        sd.valor_pago as contract_value,
+        'SERVIÇOS/CONSUMO' as sector,
+        'GASTO_AVULSO' as type,
+        NULL as portal_link,
+        sd.nome_fornecedor as company_name,
+        sd.orgao as agency,
+        sd.data_empenho as reference_date,
+        sd.cnpj_fornecedor as beneficiary_id,
+        NULL as address,
+        NULL as fiscal_name,
+        NULL as fiscal_info,
+        NULL as technical_family,
+        NULL as technical_subfamily
+      FROM silver_despesas sd
+      LEFT JOIN obra_despesa_match odm ON sd.id = odm.despesa_id
+      WHERE sd.latitude IS NOT NULL AND sd.longitude IS NOT NULL
+        AND odm.id IS NULL -- Somente as que NÃO foram vinculadas a obras
+      
+      ORDER BY reference_date DESC, contract_value DESC NULLS LAST
     `);
     return result.rows;
   },

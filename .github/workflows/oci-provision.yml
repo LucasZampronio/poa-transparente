@@ -50,7 +50,7 @@ jobs:
             --shape "VM.Standard.A1.Flex" \
             --shape-config "$SHAPE_CONFIG" \
             --image-id "$OCI_IMAGE" \
-            --vnic-details "$VNIC_DETAILS" \
+            --create-vnic-details "$VNIC_DETAILS" \
             --metadata "$METADATA" \
             --display-name "poa-transparente-prod" 2>error.log; then
             echo "Instância criada com sucesso!"
@@ -70,7 +70,7 @@ jobs:
                 --shape "VM.Standard.A1.Flex" \
                 --shape-config "$SHAPE_CONFIG" \
                 --image-id "$OCI_IMAGE" \
-                --vnic-details "$VNIC_DETAILS" \
+                --create-vnic-details "$VNIC_DETAILS" \
                 --metadata "$METADATA" \
                 --display-name "poa-transparente-prod" --debug || true
             else

@@ -87,12 +87,10 @@ def sync_silver_obras():
     cur.close()
     conn.close()
     print(f"✅ Synced {len(all_works)} works. Geocoded: {geocoded_count}")
-    cur.close()
-    conn.close()
-    print(f"✅ Synced {len(all_works)} works. Geocoded: {geocoded_count}")
 
 def sync_silver_despesas():
-    print("📡 Syncing silver_despesas from POA Open Data (Licitacon)...")
+    print("📡 Syncing silver_despesas from POA Open Data with Geocoding...")
+    geo_cache = load_geo_cache()
     csv_path = "tmp_licitacon.csv"
     if not os.path.exists(csv_path):
         url = "https://dadosabertos.poa.br/dataset/0a376fbb-4c35-4e51-93d0-ef05f32ff1e5/resource/e08dcf9a-9496-4540-a88a-10af1c4779ce/download/licitacon.csv"
@@ -106,13 +104,23 @@ def sync_silver_despesas():
     cur = conn.cursor()
     
     # Filter only relevant and recent
-    df = df[df['ano_licitacao'].isin([2023, 2024])]
-    df = df.head(5000) # Lote maior para análise real
+    df = df[df['ano_licitacao'].isin([2023, 2024, 2025, 2026])]
+    df = df.head(10000)
     
-    for _, row in df.iterrows():
+    geocoded_count = 0
+    for i, row in df.iterrows():
         desc = row.get('desc_objeto', '')
         cnpj = str(row.get('fornec_venc_cnpj_cpf', ''))
         fornecedor = row.get('fornec_vencedor', 'N/A')
+        orgao = row.get('orgao_demandante', 'PREFEITURA POA')
+        
+        # Geocodificação de despesa (Heurística: busca por locais no texto ou usa o órgão como base)
+        # Para despesas genéricas, tentamos geolocalizar o Órgão se não houver local específico na descrição
+        query_geo = f"{desc}, Porto Alegre" if len(desc) < 100 else f"{orgao}, Porto Alegre"
+        coords = geo_cache.get(query_geo) or get_coords_from_address(query_geo, geo_cache)
+        
+        lat, lng = coords if coords else (None, None)
+        if lat: geocoded_count += 1
         
         valor_str = str(row.get('valor_homologado', '0')).replace('.', '').replace(',', '.')
         try:
@@ -121,9 +129,9 @@ def sync_silver_despesas():
             valor = 0
             
         cur.execute("""
-            INSERT INTO silver_despesas (num_empenho, data_empenho, valor_empenhado, descricao, cnpj_fornecedor, nome_fornecedor, orgao)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (row.get('num_licitacao'), datetime(int(row['ano_licitacao']), 1, 1), valor, desc, cnpj, fornecedor, row.get('orgao_demandante')))
+            INSERT INTO silver_despesas (num_empenho, data_empenho, valor_empenhado, descricao, cnpj_fornecedor, nome_fornecedor, orgao, latitude, longitude)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (row.get('num_licitacao'), datetime(int(row['ano_licitacao']), 1, 1), valor, desc, cnpj, fornecedor, orgao, lat, lng))
 
         if cnpj and cnpj != 'nan':
             cur.execute("""
@@ -131,17 +139,21 @@ def sync_silver_despesas():
                 VALUES (%s, %s) ON CONFLICT (cnpj) DO NOTHING
             """, (cnpj, fornecedor))
             
+        if i % 100 == 0:
+            conn.commit()
+            print(f"📑 Progress: {i}/{len(df)} expenses synced. Geocoded: {geocoded_count}")
+            
     conn.commit()
     cur.close()
     conn.close()
-    print(f"✅ Synced {len(df)} records to silver_despesas.")
+    print(f"✅ Synced {len(df)} records to silver_despesas. Total Geocoded: {geocoded_count}")
 
 def run_matching():
-    print("🧠 Starting matching logic...")
+    print("🧠 Starting matching logic (V2 - Supplier Aware)...")
     conn = psycopg2.connect(DATABASE_URL)
     
-    obras = pd.read_sql("SELECT id, nome_obra, valor_licitado FROM silver_obras LIMIT 500", conn)
-    despesas = pd.read_sql("SELECT id, descricao, nome_fornecedor, valor_empenhado FROM silver_despesas LIMIT 5000", conn)
+    obras = pd.read_sql("SELECT id, nome_obra, valor_licitado, contratada_nome FROM silver_obras LIMIT 1000", conn)
+    despesas = pd.read_sql("SELECT id, descricao, nome_fornecedor, valor_empenhado FROM silver_despesas LIMIT 10000", conn)
     
     matches = []
     
@@ -149,21 +161,31 @@ def run_matching():
         obra_id = obra['id']
         obra_nome_clean = clean_text(obra['nome_obra'])
         obra_valor = float(obra['valor_licitado'])
+        obra_contratada = clean_text(obra['contratada_nome'])
         
         for _, desp in despesas.iterrows():
             desp_id = desp['id']
             desp_desc_clean = clean_text(desp['descricao'])
             desp_valor = float(desp['valor_empenhado'])
+            desp_fornecedor = clean_text(desp['nome_fornecedor'])
             
+            # 1. Similaridade de Texto (Objeto da Obra vs Descrição da Despesa)
             text_sim = fuzz.token_sort_ratio(obra_nome_clean, desp_desc_clean)
-            supp_sim = 50
             
+            # 2. Similaridade de Fornecedor
+            if obra_contratada and desp_fornecedor:
+                supp_sim = fuzz.token_sort_ratio(obra_contratada, desp_fornecedor)
+            else:
+                supp_sim = 0
+            
+            # 3. Similaridade de Valor
             if obra_valor > 0 and desp_valor > 0:
                 val_diff = abs(obra_valor - desp_valor) / max(obra_valor, desp_valor)
                 value_sim = max(0, 100 - (val_diff * 100))
             else:
                 value_sim = 0
                 
+            # Pesos: Texto (50%), Fornecedor (30%), Valor (20%)
             score = (text_sim * 0.5) + (supp_sim * 0.3) + (value_sim * 0.2)
             
             if score > 50:
