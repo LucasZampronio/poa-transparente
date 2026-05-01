@@ -1,5 +1,15 @@
 # POA Transparente - Diretrizes de Desenvolvimento
 
+## 🤖 Orquestração de Agentes (Tech Lead Mode)
+
+Este projeto possui um time de agentes especializados em `.gemini/agents/`. Ao iniciar o trabalho, o Gemini CLI deve atuar como o **Tech Lead / Orquestrador**:
+
+- **Comando:** `gemini start-team`
+- **Padrão de Execução (Background Team):** Os agentes devem ser disparados como processos de segundo plano (background) para não bloquear o chat principal. O Tech Lead deve priorizar as requisições diretas do usuário e monitorar o progresso dos agentes em paralelo.
+- **Missão:** Delegar tarefas automaticamente para `@developer`, `@qa` e `@data_scientist`.
+- **Regra:** Autonomia Total concedida pelo PO. O Gemini Mentor (Tech Lead) deve executar todas as tarefas e modificações de código/banco de forma autônoma, reportando apenas os resultados e o progresso.
+- **Instruções Detalhadas:** Consulte `.gemini/agents/INSTRUCTIONS.md`.
+
 ## 🛠 Arquitetura de Dados (Medallion)
 
 O projeto segue a arquitetura de medalhão para garantir rastreabilidade e performance analítica:

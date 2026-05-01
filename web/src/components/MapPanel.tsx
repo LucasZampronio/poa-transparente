@@ -28,6 +28,12 @@ const ICONS: Record<string, string> = {
   'DEFAULT': '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>'
 };
 
+const typeThemes: Record<string, string> = {
+  'OBRA': '#3b82f6', // Azul para Obras
+  'GASTO': '#ef4444', // Vermelho para Gastos
+  'DEFAULT': '#94a3b8'
+};
+
 const sectorThemes: Record<string, string> = {
   'SAUDE': '#ef4444',
   'EDUCACAO': '#3b82f6',
@@ -103,8 +109,9 @@ export default function MapPanel({ points, loading, selectedSector }: MapPanelPr
         const lat = baseLat + jitterLat;
         const lng = baseLng + jitterLng;
         
-        const color = sectorThemes[point.sector] || sectorThemes['DEFAULT'];
-        const iconPath = ICONS[point.sector] || ICONS['DEFAULT'];
+        const isObra = (point as any).type === 'OBRA';
+        const color = isObra ? typeThemes['OBRA'] : (sectorThemes[point.sector] || sectorThemes['DEFAULT']);
+        const iconPath = isObra ? ICONS['URBANISMO'] : (ICONS[point.sector] || ICONS['DEFAULT']);
 
         // Elemento-raiz (estático para o MapLibre)
         const el = document.createElement('div');
@@ -112,20 +119,19 @@ export default function MapPanel({ points, loading, selectedSector }: MapPanelPr
         
         // Elemento visual (com animações)
         const visual = document.createElement('div');
-        visual.style.width = '26px';
-        visual.style.height = '26px';
+        visual.style.width = isObra ? '32px' : '26px';
+        visual.style.height = isObra ? '32px' : '26px';
         visual.style.backgroundColor = color;
-        visual.style.borderRadius = '8px';
-        visual.style.border = '2px solid rgba(255,255,255,0.6)';
+        visual.style.borderRadius = isObra ? '12px' : '8px';
+        visual.style.border = isObra ? '3px solid white' : '2px solid rgba(255,255,255,0.6)';
         visual.style.boxShadow = `0 0 20px ${color}55`;
         visual.style.display = 'flex';
         visual.style.alignItems = 'center';
         visual.style.justifyContent = 'center';
         visual.style.cursor = 'pointer';
         visual.style.color = 'white';
-        // A transição fica APENAS no elemento visual interno
         visual.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-        visual.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none;">${iconPath}</svg>`;
+        visual.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${isObra ? 20 : 16}" height="${isObra ? 20 : 16}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none;">${iconPath}</svg>`;
 
         el.appendChild(visual);
 
@@ -153,19 +159,19 @@ export default function MapPanel({ points, loading, selectedSector }: MapPanelPr
                 <div style="background: linear-gradient(to bottom right, ${color}33, transparent); padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.05);">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="background: ${color}; color: white; padding: 4px 10px; border-radius: 8px; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em;">
-                      ${formatLabel(point.sector)}
+                      ${isObra ? 'OBRA TCE-RS' : formatLabel(point.sector)}
                     </span>
-                    <span style="color: #64748b; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace;">ANO_${workYear}</span>
+                    <span style="color: #64748b; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace;">${isObra ? 'ID_' + point.process_number : 'ANO_' + workYear}</span>
                   </div>
                   <h3 style="color: white; font-size: 15px; line-height: 1.4; font-weight: 800; margin: 0; letter-spacing: -0.02em;">${point.description_detailed}</h3>
                   <div style="margin-top: 8px; font-size: 10px; font-weight: 600; color: #64748b;">
-                    ${point.technical_family} <span style="opacity: 0.4;">•</span> ${point.technical_subfamily}
+                    ${isObra ? 'Porto Alegre / RS' : (point.technical_family + ' • ' + point.technical_subfamily)}
                   </div>
                 </div>
 
                 <div style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
                   <div>
-                    <div style="font-size: 9px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Execução e Fiscalização</div>
+                    <div style="font-size: 9px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Fornecedor / Responsável</div>
                     <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
                       <div style="font-size: 11px; font-weight: 700; color: white; margin-bottom: 2px;">${point.company_name}</div>
                       <div style="font-size: 9px; color: #64748b; font-family: 'JetBrains Mono', monospace; margin-bottom: 8px;">CNPJ: ${point.beneficiary_id}</div>
@@ -173,34 +179,33 @@ export default function MapPanel({ points, loading, selectedSector }: MapPanelPr
                       <div style="padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; gap: 8px; align-items: center;">
                         <div style="width: 20px; height: 20px; background: ${color}22; color: ${color}; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px;">👤</div>
                         <div>
-                          <div style="font-size: 10px; font-weight: 700; color: #e2e8f0;">Fiscal: ${point.fiscal_name || 'Não informado'}</div>
-                          <div style="font-size: 8px; color: #64748b;">${point.fiscal_info || 'Aguardando designação'}</div>
+                          <div style="font-size: 10px; font-weight: 700; color: #e2e8f0;">Órgão: ${point.agency || 'Não informado'}</div>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <div style="font-size: 9px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Localização e Exercício</div>
+                    <div style="font-size: 9px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Localização</div>
                     <div style="display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 12px;">
                       <div style="background: #1e293b; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: ${color}; font-size: 14px;">📍</div>
                       <div>
                         <div style="font-size: 11px; font-weight: 700; color: #e2e8f0; line-height: 1.2;">${point.address || point.district}</div>
-                        <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Ano de Exercício: ${workYear}</div>
                       </div>
                     </div>
                   </div>
 
                   <div>
                     <div style="background: #161b22; padding: 16px; border-radius: 16px; border: 1px solid ${color}33;">
-                      <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Valor Contratado</div>
+                      <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">${isObra ? 'Valor Estimado/Licitado' : 'Valor Pago'}</div>
                       <div style="font-size: 24px; font-weight: 900; color: white; letter-spacing: -0.04em;">${formatCurrency(point.contract_value)}</div>
                     </div>
                   </div>
 
+                  ${point.portal_link ? `
                   <a href="${point.portal_link}" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; background: white; color: #0f172a; border-radius: 12px; font-size: 10px; font-weight: 900; text-decoration: none; text-transform: uppercase; letter-spacing: 0.05em; width: 100%; transition: opacity 0.2s;">
                     Ver Documentação
-                  </a>
+                  </a>` : ''}
                 </div>
               </div>
             `)

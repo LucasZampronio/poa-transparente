@@ -62,6 +62,16 @@ def aggregate_gold_data():
                         total_spent = EXCLUDED.total_spent,
                         quantidade_contratos = EXCLUDED.quantidade_contratos
                 """)
+
+                # 4.5 Top Despesas Individuais (Gold Layer)
+                cur.execute("TRUNCATE TABLE gold_top_expenses")
+                cur.execute("""
+                    INSERT INTO gold_top_expenses (descricao, nome_fornecedor, valor_pago, orgao, data_empenho)
+                    SELECT descricao, nome_fornecedor, valor_pago, orgao, data_empenho
+                    FROM silver_despesas
+                    ORDER BY valor_pago DESC
+                    LIMIT 50
+                """)
                 
                 # 5. Obras com Gastos
                 cur.execute("""

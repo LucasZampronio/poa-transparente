@@ -6,7 +6,7 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from etl.utils.db import get_connection, load_company_cache, load_geo_cache
-from etl.silver.cleaners import smart_clean, map_sector
+from etl.silver.cleaners import smart_clean, map_sector, normalize_bairro
 from etl.ingestion.tce import get_works, get_coordinates, get_responsaveis
 from etl.ingestion.open_cnpj import get_company_name
 from etl.ingestion.nominatim import get_coords_from_address
@@ -67,7 +67,7 @@ def sync_tce_works():
                 for i, work in enumerate(all_works):
                     id_obra = work.get('idObra')
                     loc = work.get('localizacao', {})
-                    bairro = smart_clean(loc.get('bairro', 'PORTO ALEGRE'))
+                    bairro = normalize_bairro(loc.get('bairro', 'PORTO ALEGRE'))
                     rua = smart_clean(loc.get('logradouro', 'N/A'))
                     full_address = f"{rua}, {bairro}" if rua != "N/A" else bairro
                     

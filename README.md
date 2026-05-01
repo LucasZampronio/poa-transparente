@@ -28,16 +28,14 @@ Este projeto foi montado para simular um cenário real de produto:
 - Grafana (`monitoring/grafana/`): Dashboards provisionados para observabilidade total.
 
 ## Estrutura de pastas
-
 - `api/`: Serviço HTTP e integração com APIs de transparência (Node.js).
 - `web/`: Front-end React com mapas e dashboards.
 - `etl/`: Scripts de carga, matching e camada Gold (Python).
 - `mcp/`: Servidor Model Context Protocol (IA-ready).
-- `db/init/`: Scripts SQL, índices e definições de schema (01_bronze, 02_silver, 03_gold).
-- `monitoring/`: Configurações de Prometheus e Grafana.
-- `terraform/`: Infraestrutura como código para Oracle Cloud.
+- `db/init/`: Scripts SQL, índices e definições de schema.
+- `infra/`: Configurações de infraestrutura (Terraform, Monitoring).
+- `scripts/`: Automações de auditoria (QA) e manutenção.
 - `.github/workflows/`: Automação de provisionamento (OCI) e CI/CD.
-- `docker-compose.yml`: Orquestração completa do ambiente local.
 
 ## Novidade: Servidor MCP (Mentor)
 
@@ -50,12 +48,13 @@ Implementamos um servidor baseado no **Model Context Protocol (MCP)** que permit
 
 O projeto conta com provisionamento automatizado na **Oracle Cloud (OCI)** usando o plano *Always Free*. Devido às restrições de capacidade da OCI, implementamos um workflow de "pesca" (retry loop) via GitHub Actions que tenta alocar instâncias ARM automaticamente.
 
-- Consulte `DEPLOY_OCI.md` para detalhes do setup manual.
+- Consulte `docs/deployment/DEPLOY_OCI.md` para detalhes do setup manual.
 - Veja `.github/workflows/oci-provision.yml` para a automação.
 
-## Pré-requisitos
+...
 
-- macOS, Linux ou Windows
+![alt text](docs/assets/image-1.png)
+![alt text](docs/assets/image-2.png)
 - Docker Desktop instalado
 - Docker Desktop **iniciado**
 - Docker Compose v2 (já vem no Docker Desktop atual)

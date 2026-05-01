@@ -39,3 +39,13 @@ CREATE TABLE IF NOT EXISTS gold_series_temporais (
     data DATE PRIMARY KEY,
     total_gasto NUMERIC(14,2)
 );
+
+-- Maiores Despesas Individuais
+CREATE TABLE IF NOT EXISTS gold_top_expenses (
+    id SERIAL PRIMARY KEY,
+    descricao TEXT,
+    nome_fornecedor TEXT,
+    valor_pago NUMERIC(14,2),
+    orgao TEXT,
+    data_empenho DATE
+);

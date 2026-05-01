@@ -1,0 +1,57 @@
+import os
+import psycopg2
+import pandas as pd
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://poa:poa@localhost:5432/poa_transparente")
+
+def get_connection():
+    return psycopg2.connect(DATABASE_URL)
+
+def run_analysis():
+    conn = get_connection()
+    
+    # 1 & 2. Volume de gastos por bairro 2026 vs 2025
+    query_bairros = """
+    SELECT 
+        o.bairro,
+        SUM(CASE WHEN EXTRACT(YEAR FROM d.data_empenho) = 2025 THEN d.valor_pago ELSE 0 END) as total_2025,
+        SUM(CASE WHEN EXTRACT(YEAR FROM d.data_empenho) = 2026 THEN d.valor_pago ELSE 0 END) as total_2026
+    FROM 
+        silver_despesas d
+    JOIN 
+        obra_despesa_match m ON d.id = m.despesa_id
+    JOIN 
+        silver_obras o ON o.id = m.obra_id
+    WHERE 
+        m.confianca IN ('alta', 'media')
+    GROUP BY 
+        o.bairro
+    """
+    
+    df_bairros = pd.read_sql(query_bairros, conn)
+    df_bairros['aumento'] = df_bairros['total_2026'] - df_bairros['total_2025']
+    df_bairros_sorted = df_bairros.sort_values(by='aumento', ascending=False)
+    
+    print("--- ANÁLISE DE GASTOS POR BAIRRO (2025 vs 2026) ---")
+    print(df_bairros_sorted[['bairro', 'total_2025', 'total_2026', 'aumento']].head(10))
+    
+    # 3. Saúde do Matching
+    query_matching = """
+    SELECT 
+        confianca, 
+        COUNT(*) as total, 
+        AVG(score) as score_medio 
+    FROM 
+        obra_despesa_match 
+    GROUP BY 
+        confianca;
+    """
+    
+    df_matching = pd.read_sql(query_matching, conn)
+    print("\n--- SAÚDE DO MATCHING ---")
+    print(df_matching)
+    
+    conn.close()
+
+if __name__ == "__main__":
+    run_analysis()

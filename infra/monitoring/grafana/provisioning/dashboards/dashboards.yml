@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: poa-dashboards
+    orgId: 1
+    folder: POA Transparente
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

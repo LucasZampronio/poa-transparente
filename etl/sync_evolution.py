@@ -10,6 +10,7 @@ from etl.ingestion.tce import get_coordinates
 from etl.ingestion.nominatim import get_coords_from_address
 from etl.ingestion.open_cnpj import get_company_name
 from etl.utils.db import load_geo_cache, load_company_cache
+from etl.silver.cleaners import normalize_bairro
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://poa:poa@localhost:5432/poa_transparente")
 CNPJ_POA = "92963560000160"
@@ -44,7 +45,7 @@ def sync_silver_obras():
         ext_id = w.get('idObra')
         nome = w.get('descricaoObjeto', 'N/A')
         valor = float(w.get('valorGarantiaObra', 0)) * 20 # Proxy value
-        bairro = w.get('localizacao', {}).get('bairro', 'PORTO ALEGRE')
+        bairro = normalize_bairro(w.get('localizacao', {}).get('bairro', 'PORTO ALEGRE'))
         rua = w.get('localizacao', {}).get('logradouro', '')
         
         # Contractor info

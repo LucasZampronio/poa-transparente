@@ -9,6 +9,19 @@ def smart_clean(text):
     text = re.sub(r'[^\x20-\x7E]', '', text)
     return text.upper().strip()
 
+def normalize_bairro(bairro_name):
+    """
+    Normaliza nomes de bairros para evitar duplicatas por caixa alta/baixa
+    ou caracteres especiais. Ex: 'Centro Histórico' -> 'CENTRO HISTORICO'
+    """
+    if not bairro_name or str(bairro_name).upper() == 'PORTO ALEGRE':
+        return 'CENTRO' # Default ou tratamento para casos vazios
+    
+    clean = smart_clean(bairro_name)
+    # Remove termos comuns que podem variar
+    clean = clean.replace('BAIRRO ', '').replace(' DISTRICT', '')
+    return clean.strip()
+
 def map_sector(families):
     if not families: return 'URBANISMO'
     f = " ".join(families).upper()

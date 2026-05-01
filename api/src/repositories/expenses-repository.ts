@@ -34,13 +34,13 @@ export const ExpensesRepository = {
 
   async getMapData() {
     const result = await pool.query(`
-      -- 1. Obras (Com ou sem gastos vinculados)
+      -- 1. Todas as Obras do TCE (Independente de terem gastos vinculados no Gold)
       SELECT 
         so.bairro as district, 
         so.latitude, 
         so.longitude, 
-        so.descricao as description_detailed,
-        COALESCE(go.valor_total_gasto, 0) as contract_value,
+        so.nome_obra as description_detailed,
+        COALESCE(so.valor_licitado, 0) as contract_value,
         'INFRAESTRUTURA' as sector,
         'OBRA' as type,
         so.link_tce as portal_link,
@@ -52,22 +52,22 @@ export const ExpensesRepository = {
         NULL as fiscal_name,
         NULL as fiscal_info,
         NULL as technical_family,
-        NULL as technical_subfamily
+        NULL as technical_subfamily,
+        so.external_id::text as process_number
       FROM silver_obras so
-      LEFT JOIN gold_obras_com_gastos go ON so.id = go.obra_id
       WHERE so.latitude IS NOT NULL AND so.longitude IS NOT NULL
 
       UNION ALL
 
-      -- 2. Gastos Avulsos (Despesas que não estão vinculadas a nenhuma obra)
+      -- 2. Todas as Despesas Geocalizadas (Independente de estarem vinculadas a obras)
       SELECT 
-        'PORTO ALEGRE' as district, -- Despesas avulsas geralmente são no município
+        'PORTO ALEGRE' as district,
         sd.latitude, 
         sd.longitude, 
         sd.descricao as description_detailed,
         sd.valor_pago as contract_value,
         'SERVIÇOS/CONSUMO' as sector,
-        'GASTO_AVULSO' as type,
+        'GASTO' as type,
         NULL as portal_link,
         sd.nome_fornecedor as company_name,
         sd.orgao as agency,
@@ -77,13 +77,12 @@ export const ExpensesRepository = {
         NULL as fiscal_name,
         NULL as fiscal_info,
         NULL as technical_family,
-        NULL as technical_subfamily
+        NULL as technical_subfamily,
+        sd.num_empenho as process_number
       FROM silver_despesas sd
-      LEFT JOIN obra_despesa_match odm ON sd.id = odm.despesa_id
       WHERE sd.latitude IS NOT NULL AND sd.longitude IS NOT NULL
-        AND odm.id IS NULL -- Somente as que NÃO foram vinculadas a obras
       
-      ORDER BY reference_date DESC, contract_value DESC NULLS LAST
+      ORDER BY type DESC, reference_date DESC, contract_value DESC NULLS LAST
     `);
     return result.rows;
   },
