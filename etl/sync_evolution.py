@@ -6,11 +6,11 @@ import unicodedata
 import re
 from rapidfuzz import fuzz
 from datetime import datetime
-from etl.ingestion.tce import get_coordinates
+from etl.ingestion.tce import get_coordinates, get_responsaveis
 from etl.ingestion.nominatim import get_coords_from_address
 from etl.ingestion.open_cnpj import get_company_name
 from etl.utils.db import load_geo_cache, load_company_cache
-from etl.silver.cleaners import normalize_bairro
+from etl.silver.cleaners import normalize_bairro, smart_clean
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://poa:poa@localhost:5432/poa_transparente")
 CNPJ_POA = "92963560000160"
@@ -46,16 +46,22 @@ def sync_silver_obras():
         nome = w.get('descricaoObjeto', 'N/A')
         valor = float(w.get('valorGarantiaObra', 0)) * 20 # Proxy value
         bairro = normalize_bairro(w.get('localizacao', {}).get('bairro', 'PORTO ALEGRE'))
-        rua = w.get('localizacao', {}).get('logradouro', '')
+        rua = smart_clean(w.get('localizacao', {}).get('logradouro', ''))
+        cep = w.get('localizacao', {}).get('cep', '')
         
         # Contractor info
         cnpj = str(w.get('documentoContratada', '')).strip()
         nome_empresa = get_company_name(cnpj, company_cache) if cnpj else "N/A"
 
-        # Geolocalização
+        # Fiscal e Uso
+        fiscal_nome, fiscal_info = get_responsaveis(ext_id)
+        finalidade = ", ".join(w.get('caracteristicas', [])) if w.get('caracteristicas') else "N/A"
+
+        # Geolocalização - PRIORIDADE API TCE
         coords = get_coordinates(ext_id)
         if not coords:
-            full_address = f"{rua}, {bairro}" if rua else bairro
+            # Fallback Nominatim com endereço completo (Rua + Bairro)
+            full_address = f"{rua}, {bairro}, Porto Alegre" if rua and rua != 'N/A' else f"{bairro}, Porto Alegre"
             coords = geo_cache.get(full_address) or get_coords_from_address(full_address, geo_cache)
 
         lat, lng = coords if coords else (None, None)
@@ -63,22 +69,33 @@ def sync_silver_obras():
 
         situacao = w.get('situacaoObra', 'N/A')
         orgao = w.get('contrato', {}).get('nomeOrgao', 'PREFEITURA POA')
+        
+        # Datas reais (usando validade da garantia como proxy se não houver data_inicio explícita no payload de lista)
         ano_exercicio = int(w.get('exercicio', year))
-        data_inicio = datetime(ano_exercicio, 1, 1)
+        data_inicio_raw = w.get('dataValidadeGarantiaObra') # Exemplo de campo real
+        data_inicio = datetime.fromisoformat(data_inicio_raw) if data_inicio_raw else datetime(ano_exercicio, 1, 1)
 
         cur.execute("""
-            INSERT INTO silver_obras (external_id, nome_obra, descricao, valor_licitado, bairro, latitude, longitude, situacao, orgao, link_tce, data_inicio, contratada_cnpj, contratada_nome)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO silver_obras (
+                external_id, nome_obra, descricao, valor_licitado, bairro, logradouro, 
+                latitude, longitude, situacao, orgao, link_tce, data_inicio, 
+                contratada_cnpj, contratada_nome, fiscal_nome, fiscal_info, finalidade
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (external_id) DO UPDATE SET
                 valor_licitado = EXCLUDED.valor_licitado,
+                logradouro = EXCLUDED.logradouro,
                 latitude = COALESCE(EXCLUDED.latitude, silver_obras.latitude),
                 longitude = COALESCE(EXCLUDED.longitude, silver_obras.longitude),
                 situacao = EXCLUDED.situacao,
                 orgao = EXCLUDED.orgao,
                 data_inicio = COALESCE(EXCLUDED.data_inicio, silver_obras.data_inicio),
                 contratada_cnpj = EXCLUDED.contratada_cnpj,
-                contratada_nome = EXCLUDED.contratada_nome
-        """, (ext_id, nome, nome, valor, bairro, lat, lng, situacao, orgao, f"https://compras.tce.rs.gov.br/publico/obras/{ext_id}", data_inicio, cnpj, nome_empresa))
+                contratada_nome = EXCLUDED.contratada_nome,
+                fiscal_nome = EXCLUDED.fiscal_nome,
+                fiscal_info = EXCLUDED.fiscal_info,
+                finalidade = EXCLUDED.finalidade
+        """, (ext_id, nome, nome, valor, bairro, rua, lat, lng, situacao, orgao, f"https://compras.tce.rs.gov.br/publico/obras/{ext_id}", data_inicio, cnpj, nome_empresa, fiscal_nome, fiscal_info, finalidade))
 
         if i % 20 == 0:
             conn.commit()
@@ -215,17 +232,21 @@ def populate_gold():
     # 1. gold_obras_com_gastos
     cur.execute("TRUNCATE TABLE gold_obras_com_gastos CASCADE")
     cur.execute("""
-        INSERT INTO gold_obras_com_gastos (obra_id, nome_obra, valor_licitado, valor_total_gasto, percentual_execucao, quantidade_despesas)
+        INSERT INTO gold_obras_com_gastos (
+            obra_id, nome_obra, valor_licitado, valor_total_gasto, 
+            percentual_execucao, quantidade_despesas, data_inicio, 
+            logradouro, fiscal_nome, finalidade
+        )
         SELECT 
             o.id, o.nome_obra, o.valor_licitado,
             SUM(d.valor_empenhado) as total_gasto,
             CASE WHEN o.valor_licitado > 0 THEN (SUM(d.valor_empenhado) / o.valor_licitado) * 100 ELSE 0 END,
-            COUNT(d.id)
+            COUNT(d.id),
+            o.data_inicio, o.logradouro, o.fiscal_nome, o.finalidade
         FROM silver_obras o
-        JOIN obra_despesa_match m ON o.id = m.obra_id
-        JOIN silver_despesas d ON m.despesa_id = d.id
-        WHERE m.confianca IN ('alta', 'media')
-        GROUP BY o.id, o.nome_obra, o.valor_licitado
+        LEFT JOIN obra_despesa_match m ON o.id = m.obra_id
+        LEFT JOIN silver_despesas d ON m.despesa_id = d.id
+        GROUP BY o.id, o.nome_obra, o.valor_licitado, o.data_inicio, o.logradouro, o.fiscal_nome, o.finalidade
     """)
     
     # 2. gold_top_empresas

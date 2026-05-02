@@ -34,7 +34,7 @@ export const ExpensesRepository = {
 
   async getMapData() {
     const result = await pool.query(`
-      -- 1. Todas as Obras do TCE (Independente de terem gastos vinculados no Gold)
+      -- 1. Obras do TCE (Camada Gold Enriquecida)
       SELECT 
         so.bairro as district, 
         so.latitude, 
@@ -43,23 +43,22 @@ export const ExpensesRepository = {
         COALESCE(so.valor_licitado, 0) as contract_value,
         'INFRAESTRUTURA' as sector,
         'OBRA' as type,
-        so.link_tce as portal_link,
         COALESCE(so.contratada_nome, 'MÚLTIPLAS EMPRESAS') as company_name,
         so.orgao as agency,
         so.data_inicio as reference_date,
         so.contratada_cnpj as beneficiary_id,
-        so.bairro as address,
-        NULL as fiscal_name,
-        NULL as fiscal_info,
+        COALESCE(so.logradouro, so.bairro) as address,
+        so.fiscal_nome as fiscal_name,
+        'Setor Fiscal: ' || so.orgao as fiscal_info,
         NULL as technical_family,
-        NULL as technical_subfamily,
+        so.finalidade as technical_subfamily,
         so.external_id::text as process_number
       FROM silver_obras so
       WHERE so.latitude IS NOT NULL AND so.longitude IS NOT NULL
 
       UNION ALL
 
-      -- 2. Todas as Despesas Geocalizadas (Independente de estarem vinculadas a obras)
+      -- 2. Todas as Despesas Geocalizadas
       SELECT 
         'PORTO ALEGRE' as district,
         sd.latitude, 
@@ -68,7 +67,6 @@ export const ExpensesRepository = {
         sd.valor_pago as contract_value,
         'SERVIÇOS/CONSUMO' as sector,
         'GASTO' as type,
-        NULL as portal_link,
         sd.nome_fornecedor as company_name,
         sd.orgao as agency,
         sd.data_empenho as reference_date,
@@ -113,16 +111,38 @@ export const ExpensesRepository = {
 
   async getTopExpenses() {
     const result = await pool.query(`
-      SELECT 
+      (SELECT 
+        nome_obra as description, 
+        COALESCE(contratada_nome, 'MÚLTIPLAS EMPRESAS') as company_name,
+        ROUND(valor_licitado::numeric, 2) AS amount,
+        orgao as agency,
+        'OBRA' as type,
+        latitude,
+        longitude
+      FROM silver_obras 
+      WHERE valor_licitado > 0)
+
+      UNION ALL
+
+      (SELECT 
         descricao as description, 
         nome_fornecedor as company_name,
         ROUND(valor_pago::numeric, 2) AS amount,
-        orgao as agency
+        orgao as agency,
+        'DESPESA' as type,
+        latitude,
+        longitude
       FROM silver_despesas 
-      ORDER BY valor_pago DESC 
+      WHERE valor_pago > 0)
+
+      ORDER BY amount DESC 
       LIMIT 10
     `);
-    return result.rows;
+    // Map 'amount' to 'total_spent' to maintain compatibility with RankingPanel props in Dashboard.tsx
+    return result.rows.map(row => ({
+      ...row,
+      total_spent: row.amount
+    }));
   },
 
   async getTimeSeries() {

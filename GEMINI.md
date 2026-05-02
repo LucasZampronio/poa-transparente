@@ -5,8 +5,8 @@
 Este projeto possui um time de agentes especializados em `.gemini/agents/`. Ao iniciar o trabalho, o Gemini CLI deve atuar como o **Tech Lead / Orquestrador**:
 
 - **Comando:** `gemini start-team`
-- **Padrão de Execução (Background Team):** Os agentes devem ser disparados como processos de segundo plano (background) para não bloquear o chat principal. O Tech Lead deve priorizar as requisições diretas do usuário e monitorar o progresso dos agentes em paralelo.
-- **Missão:** Delegar tarefas automaticamente para `@developer`, `@qa` e `@data_scientist`.
+- **Padrão de Execução:** O comando `start-team` sinaliza o início da sessão. O Tech Lead **não deve disparar processos automáticos** ou agentes em background ao receber este comando. Toda delegação de tarefas aos agentes (@developer, @qa e @data_scientist) deve ser feita apenas sob demanda explícita do usuário.
+- **Missão:** Atuar como Mentor Senior, auxiliando o usuário no desenvolvimento e aguardando instruções para coordenação do time.
 - **Regra:** Autonomia Total concedida pelo PO. O Gemini Mentor (Tech Lead) deve executar todas as tarefas e modificações de código/banco de forma autônoma, reportando apenas os resultados e o progresso.
 - **Instruções Detalhadas:** Consulte `.gemini/agents/INSTRUCTIONS.md`.
 
@@ -23,18 +23,12 @@ O projeto segue a arquitetura de medalhão para garantir rastreabilidade e perfo
 - **Regra:** Dados limpos, normalizados e tipados. Deduplicação baseada em IDs externos ou chaves naturais.
 - **LEGACY:** A tabela `public_expenses` é considerada legada e não deve ser utilizada para novas funcionalidades. Ela foi substituída pelo pipeline Silver -> Matching -> Gold.
 
-### 3. Camada Matching (Linking)
-- **Tabela:** `obra_despesa_match`.
-- **Lógica:** Fuzzy matching (via `rapidfuzz`) entre o objeto da obra (TCE) e o objeto da despesa (POA).
-- **Fórmula de Score:** `(Similaridade Texto * 0.5) + (Similaridade Fornecedor * 0.3) + (Proximidade Valor * 0.2)`.
-- **Confiança:** 
-  - `Alta`: Score > 80
-  - `Média`: Score 50-80
-  - `Baixa`: Score < 50 (Geralmente ignorado em agregações Gold).
+### 3. Camada Gold (Analytical)
+- **Tabelas:** `gold_obras`, `gold_despesas_por_bairro`, `gold_top_empresas`, `gold_series_temporais`.
+- **Regra:** Esta camada consolida os dados de Obras (TCE-RS) e Despesas (Dados Abertos POA) de forma independente. Não há tentativa de vinculação direta entre empenhos e obras, garantindo a pureza dos dados originais.
+- **Origem Obras:** Valor Licitado e Situação direto do TCE-RS.
+- **Origem Despesas:** Valores pagos e fornecedores direto do Portal da Transparência de Porto Alegre.
 
-### 4. Camada Gold (Analytical)
-- **Tabelas:** `gold_obras_com_gastos`, `gold_top_empresas`, `gold_gastos_por_bairro`, `gold_series_temporais`.
-- **Regra:** Apenas estas tabelas devem ser lidas pela API em endpoints analíticos. Elas são reconstruídas periodicamente pelo ETL.
 
 ## 📡 Integrações Governamentais (Cuidado!)
 Existem três fontes principais:

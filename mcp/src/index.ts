@@ -9,7 +9,7 @@ const { Pool } = pg;
 const DIARIO_PATH = path.join(process.cwd(), '..', 'DIARIO.md');
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/poatransparente',
+  connectionString: process.env.DATABASE_URL || 'postgresql://poa:poa@localhost:5432/poa_transparente',
 });
 
 const server = new McpServer({

@@ -6,23 +6,35 @@ CNPJ_POA = "92963560000160"
 MUNICIPIO_CODE = "88301"
 
 def get_works(year):
+    print(f"🔍 Fetching works for year {year}...")
     all_content = []
     page = 0
     size = 100
     while True:
         url = f"https://portal.tce.rs.gov.br/api/obras/v1/orgaos/{CNPJ_POA}/obras?municipio={MUNICIPIO_CODE}&exercicio={year}&page={page}&size={size}"
         try:
-            response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
+            response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
             if response.status_code == 200:
                 data = response.json()
                 content = data.get('content', [])
-                if not content: break
+                if not content: 
+                    break
+                
                 all_content.extend(content)
-                if len(content) < size: break
+                print(f"   - Page {page}: Found {len(content)} works. Total so far: {len(all_content)}")
+                
+                # Check if it's the last page
+                if data.get('last') is True or len(content) < size:
+                    break
+                    
                 page += 1
-                time.sleep(0.1)
-            else: break
-        except: break
+                time.sleep(0.5) # Avoid rate limiting
+            else:
+                print(f"   ⚠️ Error {response.status_code} on page {page}")
+                break
+        except Exception as e:
+            print(f"   ❌ Exception: {e}")
+            break
     return all_content
 
 def get_coordinates(id_obra):

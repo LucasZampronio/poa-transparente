@@ -29,26 +29,35 @@ export function useDashboardData() {
   }, []);
 
   const filteredData = useMemo(() => {
-    let points = Array.isArray(allMapPoints) ? allMapPoints : [];
-    let topExpenses = Array.isArray(globalTopExpenses) ? globalTopExpenses : [];
+    const safePoints = Array.isArray(allMapPoints) ? allMapPoints : [];
+    const safeTopExpenses = Array.isArray(globalTopExpenses) ? globalTopExpenses : [];
+
+    let points = [...safePoints];
 
     if (selectedYear !== 'ALL') {
-      points = points.filter(p => String(p.reference_date || '').includes(selectedYear));
+      points = points.filter(p => {
+        if (!p) return false;
+        const dateStr = String(p.reference_date || '');
+        // Se for ISO string (2026-01-01...), pega os 4 primeiros
+        // Se for string de data formatada ou objeto Date convertido, procura o ano
+        return dateStr.includes(selectedYear);
+      });
     }
 
     if (selectedSector) {
-      points = points.filter(p => p.sector === selectedSector);
+      points = points.filter(p => p && p.sector === selectedSector);
     }
     
     // Calcula Resumo (KPIs)
-    const totalSpent = points.reduce((acc, p) => acc + Number(p.contract_value), 0);
-    const uniqueCompanies = new Set(points.map(p => p.company_name)).size;
-    const uniqueAgencies = new Set(points.map(p => p.agency)).size;
+    const totalSpent = points.reduce((acc, p) => acc + Number(p?.contract_value || 0), 0);
+    const uniqueCompanies = new Set(points.map(p => p?.company_name).filter(Boolean)).size;
+    const uniqueAgencies = new Set(points.map(p => p?.agency).filter(Boolean)).size;
 
     // Calcula Rankings (Empresas)
     const companyMap: Record<string, number> = {};
     points.forEach(p => {
-      companyMap[p.company_name] = (companyMap[p.company_name] || 0) + Number(p.contract_value);
+      if (!p || !p.company_name) return;
+      companyMap[p.company_name] = (companyMap[p.company_name] || 0) + Number(p.contract_value || 0);
     });
     const topCompanies = Object.entries(companyMap)
       .map(([name, value]) => ({ company_name: name, total_received: value }))
@@ -58,29 +67,40 @@ export function useDashboardData() {
     // Calcula Rankings (Órgãos)
     const agencyMap: Record<string, number> = {};
     points.forEach(p => {
-      agencyMap[p.agency] = (agencyMap[p.agency] || 0) + Number(p.contract_value);
+      if (!p || !p.agency) return;
+      agencyMap[p.agency] = (agencyMap[p.agency] || 0) + Number(p.contract_value || 0);
     });
     const topAgencies = Object.entries(agencyMap)
       .map(([name, value]) => ({ agency: name, total_spent: value }))
       .sort((a, b) => Number(b.total_spent) - Number(a.total_spent))
       .slice(0, 10);
 
-    // Maiores Despesas Individuais (Empenhos Reais)
-    const topExpensesList = topExpenses.map(e => ({
-      description: e.description,
-      total_spent: e.amount,
-      company_name: e.company_name,
-      agency: e.agency
-    }));
+    // Maiores Despesas Individuais (Empenhos Reais) - Segura contra nulos
+    const topExpensesList = safeTopExpenses
+      .filter(e => e && e.description)
+      .map(e => ({
+        description: e.description,
+        total_spent: e.amount || 0,
+        company_name: e.company_name || 'N/A',
+        agency: e.agency || 'N/A',
+        type: e.type,
+        latitude: e.latitude,
+        longitude: e.longitude
+      }));
 
-    // Calcula Lista de Setores
-    const sectorSource = selectedYear === 'ALL' ? allMapPoints : allMapPoints.filter(p => p.reference_date.startsWith(selectedYear));
+    // Calcula Lista de Setores baseada nos pontos TOTAIS do ano selecionado
+    const sectorSource = selectedYear === 'ALL' 
+      ? safePoints 
+      : safePoints.filter(p => p && String(p.reference_date || '').includes(selectedYear));
+    
     const sectorMap: Record<string, { count: number, total: number }> = {};
     sectorSource.forEach(p => {
+      if (!p || !p.sector) return;
       if (!sectorMap[p.sector]) sectorMap[p.sector] = { count: 0, total: 0 };
       sectorMap[p.sector].count++;
-      sectorMap[p.sector].total += Number(p.contract_value);
+      sectorMap[p.sector].total += Number(p.contract_value || 0);
     });
+    
     const sectorList = Object.entries(sectorMap).map(([name, stat]) => ({
       name,
       count: stat.count,
@@ -100,7 +120,7 @@ export function useDashboardData() {
       topExpenses: topExpensesList,
       sectorList
     };
-  }, [allMapPoints, selectedYear, selectedSector]);
+  }, [allMapPoints, globalTopExpenses, selectedYear, selectedSector]);
 
   return {
     allMapPoints,

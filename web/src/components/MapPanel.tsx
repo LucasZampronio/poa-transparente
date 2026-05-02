@@ -12,6 +12,7 @@ type MapPanelProps = {
   selectedCategories?: string[];
   onSelectSector?: (sector: string | null) => void;
   onToggleCategory?: (category: string) => void;
+  focusPoint?: { lat: number; lng: number; description?: string } | null;
 };
 
 const ICONS: Record<string, string> = {
@@ -29,8 +30,8 @@ const ICONS: Record<string, string> = {
 };
 
 const typeThemes: Record<string, string> = {
-  'OBRA': '#3b82f6', // Azul para Obras
-  'GASTO': '#ef4444', // Vermelho para Gastos
+  'OBRA': '#3b82f6',
+  'GASTO': '#ef4444',
   'DEFAULT': '#94a3b8'
 };
 
@@ -48,7 +49,7 @@ const sectorThemes: Record<string, string> = {
   'DEFAULT': '#94a3b8'
 };
 
-export default function MapPanel({ points, loading, selectedSector }: MapPanelProps) {
+export default function MapPanel({ points, loading, selectedSector, focusPoint }: MapPanelProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markers = useRef<maplibregl.Marker[]>([]);
@@ -56,14 +57,16 @@ export default function MapPanel({ points, loading, selectedSector }: MapPanelPr
   const lastPointsHash = useRef<string>('');
   const [mapReady, setMapReady] = useState(false);
 
+  // 1. Inicialização do Mapa (Apenas uma vez)
   useEffect(() => {
-    if (!mapContainer.current) return;
-    
+    if (!mapContainer.current || map.current) return;
+
     map.current = new maplibregl.Map({
       container: mapContainer.current,
       style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
       center: [-51.21, -30.03],
-      zoom: 11
+      zoom: 11,
+      attributionControl: false
     });
 
     popup.current = new maplibregl.Popup({ 
@@ -77,33 +80,54 @@ export default function MapPanel({ points, loading, selectedSector }: MapPanelPr
       setMapReady(true);
     });
 
-    return () => { map.current?.remove(); };
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
   }, []);
 
+  // 2. Efeito para Centralizar no Ponto de Foco
+  useEffect(() => {
+    if (mapReady && map.current && focusPoint) {
+      map.current.flyTo({
+        center: [focusPoint.lng, focusPoint.lat],
+        zoom: 15,
+        essential: true,
+        duration: 2000
+      });
+      popup.current?.remove();
+    }
+  }, [mapReady, focusPoint]);
+
+  // 3. Gerenciamento de Marcadores e Dados
   useEffect(() => {
     if (!mapReady || !map.current) return;
 
-    // Hash mais robusto para detectar mudanças nos dados sem ser pesado demais
-    const currentHash = `${points.length}-${points[0]?.process_number || ''}-${points[points.length - 1]?.process_number || ''}`;
-    const hasDataChanged = currentHash !== lastPointsHash.current;
+    const hasPoints = Array.isArray(points) && points.length > 0;
+    const currentHash = hasPoints 
+      ? `${points.length}-${points[0]?.process_number || ''}-${selectedSector || 'all'}`
+      : 'empty';
     
-    if (hasDataChanged) {
+    if (currentHash !== lastPointsHash.current) {
       lastPointsHash.current = currentHash;
 
-      // Limpa marcadores anteriores
+      // Limpar marcadores anteriores
       markers.current.forEach(m => m.remove());
       markers.current = [];
       popup.current?.remove();
 
-      // Validação robusta de coordenadas (evita filtrar 0 se fosse o caso, embora improvável em POA)
-      const validPoints = points.filter(p => p.latitude != null && p.longitude != null && !isNaN(Number(p.latitude)));
+      if (!hasPoints) return;
+
+      const validPoints = points.filter(p => 
+        p && p.latitude != null && p.longitude != null && 
+        !isNaN(Number(p.latitude)) && !isNaN(Number(p.longitude))
+      );
       
-      validPoints.forEach((point, index) => {
+      validPoints.forEach((point) => {
         const baseLat = Number(point.latitude);
         const baseLng = Number(point.longitude);
         
-        // JITTERING: Se vários pontos estão na mesma coordenada (ex: mesma secretaria), 
-        // espalha eles levemente para que todos sejam clicáveis.
+        // Jittering para evitar sobreposição total
         const jitterLat = (Math.random() - 0.5) * 0.0005;
         const jitterLng = (Math.random() - 0.5) * 0.0005;
         const lat = baseLat + jitterLat;
@@ -113,11 +137,9 @@ export default function MapPanel({ points, loading, selectedSector }: MapPanelPr
         const color = isObra ? typeThemes['OBRA'] : (sectorThemes[point.sector] || sectorThemes['DEFAULT']);
         const iconPath = isObra ? ICONS['URBANISMO'] : (ICONS[point.sector] || ICONS['DEFAULT']);
 
-        // Elemento-raiz (estático para o MapLibre)
         const el = document.createElement('div');
         el.className = 'marker-wrapper';
         
-        // Elemento visual (com animações)
         const visual = document.createElement('div');
         visual.style.width = isObra ? '32px' : '26px';
         visual.style.height = isObra ? '32px' : '26px';
@@ -141,84 +163,51 @@ export default function MapPanel({ points, loading, selectedSector }: MapPanelPr
 
         visual.addEventListener('mouseenter', () => { 
           visual.style.transform = 'scale(1.4) translateY(-4px)';
-          visual.style.zIndex = '1000';
+          el.style.zIndex = '1000';
         });
         visual.addEventListener('mouseleave', () => { 
           visual.style.transform = 'scale(1) translateY(0)';
-          visual.style.zIndex = '1';
+          el.style.zIndex = '1';
         });
 
         visual.addEventListener('click', (e) => {
           e.stopPropagation();
-          const workYear = new Date(point.reference_date).getFullYear();
+          const refDate = point.reference_date ? new Date(point.reference_date) : null;
+          const workYear = refDate && !isNaN(refDate.getTime()) ? refDate.getFullYear() : 'N/A';
+          const formattedDate = refDate && !isNaN(refDate.getTime()) ? refDate.toLocaleDateString('pt-BR') : 'Não informada';
           
           popup.current!
             .setLngLat([lng, lat])
             .setHTML(`
-              <div class="custom-popup-content" style="padding: 0; font-family: 'Inter', sans-serif; width: 320px; background: #0f1115; color: #cbd5e1; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);">
-                <div style="background: linear-gradient(to bottom right, ${color}33, transparent); padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <span style="background: ${color}; color: white; padding: 4px 10px; border-radius: 8px; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em;">
-                      ${isObra ? 'OBRA TCE-RS' : formatLabel(point.sector)}
+              <div class="custom-popup-content" style="padding: 0; font-family: sans-serif; width: 280px; background: #0f1115; color: #cbd5e1; border-radius: 12px; overflow: hidden;">
+                <div style="background: linear-gradient(to bottom right, ${color}33, transparent); padding: 15px;">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="background: ${color}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 900; text-transform: uppercase;">
+                      ${isObra ? 'OBRA' : formatLabel(point.sector)}
                     </span>
-                    <span style="color: #64748b; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace;">${isObra ? 'ID_' + point.process_number : 'ANO_' + workYear}</span>
+                    <span style="color: #64748b; font-size: 9px;">${isObra ? 'ID_' + point.process_number : 'ANO_' + workYear}</span>
                   </div>
-                  <h3 style="color: white; font-size: 15px; line-height: 1.4; font-weight: 800; margin: 0; letter-spacing: -0.02em;">${point.description_detailed}</h3>
-                  <div style="margin-top: 8px; font-size: 10px; font-weight: 600; color: #64748b;">
-                    ${isObra ? 'Porto Alegre / RS' : (point.technical_family + ' • ' + point.technical_subfamily)}
-                  </div>
+                  <h3 style="color: white; font-size: 13px; font-weight: 700; margin: 0;">${point.description_detailed}</h3>
                 </div>
-
-                <div style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
-                  <div>
-                    <div style="font-size: 9px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Fornecedor / Responsável</div>
-                    <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
-                      <div style="font-size: 11px; font-weight: 700; color: white; margin-bottom: 2px;">${point.company_name}</div>
-                      <div style="font-size: 9px; color: #64748b; font-family: 'JetBrains Mono', monospace; margin-bottom: 8px;">CNPJ: ${point.beneficiary_id}</div>
-                      
-                      <div style="padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; gap: 8px; align-items: center;">
-                        <div style="width: 20px; height: 20px; background: ${color}22; color: ${color}; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px;">👤</div>
-                        <div>
-                          <div style="font-size: 10px; font-weight: 700; color: #e2e8f0;">Órgão: ${point.agency || 'Não informado'}</div>
-                        </div>
-                      </div>
-                    </div>
+                <div style="padding: 15px; border-top: 1px solid rgba(255,255,255,0.05);">
+                  <div style="font-size: 11px; color: white; margin-bottom: 4px;">${point.company_name}</div>
+                  <div style="font-size: 10px; color: #64748b; margin-bottom: 8px;">${point.address}</div>
+                  <div style="background: rgba(255,255,255,0.05); padding: 8px; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 16px; font-weight: 800; color: white;">${formatCurrency(point.contract_value)}</div>
                   </div>
-
-                  <div>
-                    <div style="font-size: 9px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Localização</div>
-                    <div style="display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 12px;">
-                      <div style="background: #1e293b; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: ${color}; font-size: 14px;">📍</div>
-                      <div>
-                        <div style="font-size: 11px; font-weight: 700; color: #e2e8f0; line-height: 1.2;">${point.address || point.district}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style="background: #161b22; padding: 16px; border-radius: 16px; border: 1px solid ${color}33;">
-                      <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">${isObra ? 'Valor Estimado/Licitado' : 'Valor Pago'}</div>
-                      <div style="font-size: 24px; font-weight: 900; color: white; letter-spacing: -0.04em;">${formatCurrency(point.contract_value)}</div>
-                    </div>
-                  </div>
-
-                  ${point.portal_link ? `
-                  <a href="${point.portal_link}" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; background: white; color: #0f172a; border-radius: 12px; font-size: 10px; font-weight: 900; text-decoration: none; text-transform: uppercase; letter-spacing: 0.05em; width: 100%; transition: opacity 0.2s;">
-                    Ver Documentação
-                  </a>` : ''}
                 </div>
               </div>
             `)
             .addTo(map.current!);
         });
+
         markers.current.push(marker);
       });
 
-      // Só faz o fitBounds se o setor mudou ou se é a primeira carga
       if (validPoints.length > 0) {
         const bounds = new maplibregl.LngLatBounds();
         validPoints.forEach(p => bounds.extend([Number(p.longitude), Number(p.latitude)]));
-        map.current.fitBounds(bounds, { padding: 120, maxZoom: 15, duration: 1500 });
+        map.current.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 1000 });
       }
     }
   }, [mapReady, points, selectedSector]);

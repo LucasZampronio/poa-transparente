@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import MapPanel from '../components/MapPanel';
 import RankingPanel from '../components/RankingPanel';
 import { formatCurrency } from '../services/api';
@@ -17,6 +18,18 @@ export default function Dashboard() {
     setSelectedSector,
     loading
   } = useDashboardData();
+
+  const [focusPoint, setFocusPoint] = useState<{ lat: number; lng: number; description?: string } | null>(null);
+
+  const handleRowClick = (row: any) => {
+    if (row.latitude && row.longitude) {
+      setFocusPoint({
+        lat: Number(row.latitude),
+        lng: Number(row.longitude),
+        description: row.description
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -41,6 +54,7 @@ export default function Dashboard() {
         loading={false}
         onSelectSector={setSelectedSector}
         onToggleCategory={() => {}}
+        focusPoint={focusPoint}
       />
 
       <div className="absolute inset-0 pointer-events-none flex flex-col z-10">
@@ -141,6 +155,7 @@ export default function Dashboard() {
                   rows={filteredData.topExpenses}
                   labelKey="description"
                   valueKey="total_spent"
+                  onRowClick={handleRowClick}
                 />
                 <RankingPanel 
                   title="Principais Órgãos"
@@ -153,6 +168,7 @@ export default function Dashboard() {
                   rows={filteredData.topCompanies}
                   labelKey="company_name"
                   valueKey="total_received"
+                  onRowClick={handleRowClick}
                 />
               </div>
             </div>

@@ -2,7 +2,7 @@ import unicodedata
 import re
 
 def smart_clean(text):
-    if text is None: return "N/A"
+    if text is None or str(text).lower() in ['nan', 'none', '', 'null']: return "N/A"
     text = str(text)
     nfkd_form = unicodedata.normalize('NFKD', text)
     text = "".join([c for c in nfkd_form if not unicodedata.combining(c)])
