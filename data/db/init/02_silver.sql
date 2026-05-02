@@ -2,28 +2,6 @@
 -- CAMADA SILVER (Dados Limpos e Padronizados)
 -- ==========================================
 
--- Gastos Públicos (Dataset Consolidado - Legacy)
-CREATE TABLE IF NOT EXISTS public_expenses (
-  id SERIAL PRIMARY KEY,
-  reference_date DATE NOT NULL,
-  agency VARCHAR(150) NOT NULL,
-  company_name VARCHAR(180) NOT NULL,
-  category VARCHAR(120) NOT NULL,
-  sector VARCHAR(100),
-  district VARCHAR(120) NOT NULL,
-  latitude NUMERIC(9,6),
-  longitude NUMERIC(9,6),
-  contract_value NUMERIC(14,2) NOT NULL,
-  bidding_count INTEGER NOT NULL,
-  beneficiary_id VARCHAR(20),
-  process_number VARCHAR(100),
-  description_detailed TEXT,
-  portal_link TEXT,
-  address TEXT,
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE (process_number, company_name, description_detailed)
-);
-
 -- Obras (Dados do TCE-RS)
 CREATE TABLE IF NOT EXISTS silver_obras (
     id SERIAL PRIMARY KEY,

@@ -13,10 +13,6 @@ CREATE INDEX IF NOT EXISTS idx_portal_beneficios_lookup
   ON portal_beneficios_municipio(dataset_key, municipio_codigo_ibge, mes_ano);
 
 -- Silver Indexes
-CREATE INDEX IF NOT EXISTS idx_public_expenses_reference_date ON public_expenses(reference_date);
-CREATE INDEX IF NOT EXISTS idx_public_expenses_agency ON public_expenses(agency);
-CREATE INDEX IF NOT EXISTS idx_public_expenses_category ON public_expenses(category);
-
 CREATE INDEX IF NOT EXISTS idx_silver_despesas_cnpj ON silver_despesas(cnpj_fornecedor);
 CREATE INDEX IF NOT EXISTS idx_silver_obras_bairro ON silver_obras(bairro);
 

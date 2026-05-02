@@ -4,6 +4,8 @@ import { ApiService, MapPoint } from '../services/api';
 export function useDashboardData() {
   const [allMapPoints, setAllMapPoints] = useState<MapPoint[]>([]);
   const [globalTopExpenses, setGlobalTopExpenses] = useState<any[]>([]);
+  const [globalTopCompanies, setGlobalTopCompanies] = useState<any[]>([]);
+  const [globalTopAgencies, setGlobalTopAgencies] = useState<any[]>([]);
   const [selectedYear, setSelectedYear] = useState<string>('ALL');
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   
@@ -13,12 +15,16 @@ export function useDashboardData() {
   useEffect(() => {
     async function initData() {
       try {
-        const [mapPoints, expenses] = await Promise.all([
+        const [mapPoints, expenses, companies, agencies] = await Promise.all([
           ApiService.fetchMapPoints(),
-          ApiService.fetchRankingExpenses()
+          ApiService.fetchRankingExpenses(),
+          ApiService.fetchRankingCompanies(),
+          ApiService.fetchRankingAgencies()
         ]);
         setAllMapPoints(mapPoints);
         setGlobalTopExpenses(expenses);
+        setGlobalTopCompanies(companies);
+        setGlobalTopAgencies(agencies);
       } catch (e) {
         setError((e as Error).message);
       } finally {
@@ -31,6 +37,8 @@ export function useDashboardData() {
   const filteredData = useMemo(() => {
     const safePoints = Array.isArray(allMapPoints) ? allMapPoints : [];
     const safeTopExpenses = Array.isArray(globalTopExpenses) ? globalTopExpenses : [];
+    const safeTopCompanies = Array.isArray(globalTopCompanies) ? globalTopCompanies : [];
+    const safeTopAgencies = Array.isArray(globalTopAgencies) ? globalTopAgencies : [];
 
     let points = [...safePoints];
 
@@ -52,28 +60,6 @@ export function useDashboardData() {
     const totalSpent = points.reduce((acc, p) => acc + Number(p?.contract_value || 0), 0);
     const uniqueCompanies = new Set(points.map(p => p?.company_name).filter(Boolean)).size;
     const uniqueAgencies = new Set(points.map(p => p?.agency).filter(Boolean)).size;
-
-    // Calcula Rankings (Empresas)
-    const companyMap: Record<string, number> = {};
-    points.forEach(p => {
-      if (!p || !p.company_name) return;
-      companyMap[p.company_name] = (companyMap[p.company_name] || 0) + Number(p.contract_value || 0);
-    });
-    const topCompanies = Object.entries(companyMap)
-      .map(([name, value]) => ({ company_name: name, total_received: value }))
-      .sort((a, b) => Number(b.total_received) - Number(a.total_received))
-      .slice(0, 10);
-
-    // Calcula Rankings (Órgãos)
-    const agencyMap: Record<string, number> = {};
-    points.forEach(p => {
-      if (!p || !p.agency) return;
-      agencyMap[p.agency] = (agencyMap[p.agency] || 0) + Number(p.contract_value || 0);
-    });
-    const topAgencies = Object.entries(agencyMap)
-      .map(([name, value]) => ({ agency: name, total_spent: value }))
-      .sort((a, b) => Number(b.total_spent) - Number(a.total_spent))
-      .slice(0, 10);
 
     // Maiores Despesas Individuais (Empenhos Reais) - Segura contra nulos
     const topExpensesList = safeTopExpenses
@@ -115,8 +101,8 @@ export function useDashboardData() {
         companies_count: String(uniqueCompanies),
         agencies_count: String(uniqueAgencies)
       },
-      topCompanies,
-      topAgencies,
+      topCompanies: safeTopCompanies,
+      topAgencies: safeTopAgencies,
       topExpenses: topExpensesList,
       sectorList
     };

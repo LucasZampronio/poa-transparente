@@ -45,7 +45,8 @@ def get_coordinates(id_obra):
             coords = response.json()
             if isinstance(coords, list) and len(coords) > 0:
                 return float(coords[0].get('latitude')), float(coords[0].get('longitude'))
-    except: pass
+    except Exception as e:
+        print(f"   ⚠️ Exception on get_coordinates({id_obra}): {e}")
     return None
 
 def get_responsaveis(id_obra):
@@ -62,5 +63,6 @@ def get_responsaveis(id_obra):
                     setor = r.get('setor', 'N/A')
                     vinculo = r.get('vinculo', 'N/A')
                     return nome, f"Setor: {setor} | Vinculo: {vinculo}"
-    except: pass
+    except Exception as e:
+        print(f"   ⚠️ Exception on get_responsaveis({id_obra}): {e}")
     return None, None

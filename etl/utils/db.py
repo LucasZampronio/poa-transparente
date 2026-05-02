@@ -1,10 +1,28 @@
 import os
-import psycopg2
+from psycopg2 import pool
+from contextlib import contextmanager
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://poa:poa@localhost:5432/poa_transparente")
 
+# Initialize connection pool
+try:
+    connection_pool = pool.SimpleConnectionPool(1, 20, DATABASE_URL)
+    if connection_pool:
+        print("✅ Connection pool created successfully")
+except Exception as e:
+    print(f"❌ Error creating connection pool: {e}")
+    connection_pool = None
+
+@contextmanager
 def get_connection():
-    return psycopg2.connect(DATABASE_URL)
+    if not connection_pool:
+        raise Exception("Connection pool is not initialized")
+    
+    conn = connection_pool.getconn()
+    try:
+        yield conn
+    finally:
+        connection_pool.putconn(conn)
 
 def load_company_cache():
     cache = {}

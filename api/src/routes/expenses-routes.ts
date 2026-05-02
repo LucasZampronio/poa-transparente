@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { ExpensesController } from '../controllers/expenses-controller.js';
+import { requireAuth } from '../middlewares/auth.js';
 
 const router = Router();
 
@@ -14,7 +15,6 @@ router.get('/rankings/expenses', ExpensesController.getTopExpenses);
 router.get('/timeseries', ExpensesController.getTimeSeries);
 
 // Sync Actions
-router.post('/sync/tce', ExpensesController.syncTce);
-router.post('/sync/cleanup', ExpensesController.cleanup);
+router.post('/sync/cleanup', requireAuth, ExpensesController.cleanup);
 
 export default router;

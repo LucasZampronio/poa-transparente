@@ -92,7 +92,10 @@ def aggregate_gold_data():
                         percentual_execucao = EXCLUDED.percentual_execucao,
                         quantidade_despesas = EXCLUDED.quantidade_despesas
                 """)
-            conn.commit()
+                conn.commit()
+            except Exception as inner_e:
+                conn.rollback()
+                raise inner_e
         print("--- ✨ GOLD LAYER ATUALIZADA! ---")
     except Exception as e:
         print(f"❌ Erro ao atualizar Gold Layer: {e}")
