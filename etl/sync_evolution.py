@@ -42,10 +42,8 @@ def sync_silver_obras():
     
     geocoded_count = 0
     for i, w in enumerate(all_works):
-        ext_id = w.get('idObra')
-        nome = w.get('descricaoObjeto', 'N/A')
-        valor = float(w.get('valorGarantiaObra', 0)) * 20 # Proxy value
-        bairro = normalize_bairro(w.get('localizacao', {}).get('bairro', 'PORTO ALEGRE'))
+        # Valor Real (Se a API não fornecer o valor total, deixamos como NULL - Sem estimativas ou multiplicadores!)
+        valor = None
         rua = smart_clean(w.get('localizacao', {}).get('logradouro', ''))
         cep = w.get('localizacao', {}).get('cep', '')
         

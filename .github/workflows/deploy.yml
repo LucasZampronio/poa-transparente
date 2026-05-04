@@ -1,0 +1,52 @@
+name: CI/CD Pipeline - Deploy to OCI
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: './api/package-lock.json'
+
+      - name: Install API Dependencies
+        working-directory: ./api
+        run: npm install
+
+      - name: Build API
+        working-directory: ./api
+        run: npm run build
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy to OCI via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          script: |
+            cd ~/poa-transparente
+            git pull origin main
+            
+            # Exporta variáveis de ambiente necessárias
+            export PORTAL_TRANSPARENCIA_API_KEY="${{ secrets.PORTAL_TRANSPARENCIA_API_KEY }}"
+            
+            # Reconstroi e sobe os containers
+            docker compose down
+            docker compose up -d --build
+            
+            # Limpeza de imagens órfãs para economizar disco na VM Always Free
+            docker image prune -f

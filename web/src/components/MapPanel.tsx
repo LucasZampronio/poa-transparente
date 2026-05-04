@@ -179,21 +179,58 @@ export default function MapPanel({ points, loading, selectedSector, focusPoint }
           popup.current!
             .setLngLat([lng, lat])
             .setHTML(`
-              <div class="custom-popup-content" style="padding: 0; font-family: sans-serif; width: 280px; background: #0f1115; color: #cbd5e1; border-radius: 12px; overflow: hidden;">
-                <div style="background: linear-gradient(to bottom right, ${color}33, transparent); padding: 15px;">
-                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <span style="background: ${color}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 900; text-transform: uppercase;">
+              <div class="custom-popup-content" style="padding: 0; font-family: 'Inter', sans-serif; width: 320px; background: #0f1115; color: #cbd5e1; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);">
+                <div style="background: linear-gradient(to bottom right, ${color}33, transparent); padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <span style="background: ${color}; color: white; padding: 4px 10px; border-radius: 8px; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em;">
                       ${isObra ? 'OBRA' : formatLabel(point.sector)}
                     </span>
-                    <span style="color: #64748b; font-size: 9px;">${isObra ? 'ID_' + point.process_number : 'ANO_' + workYear}</span>
+                    <span style="color: #64748b; font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace;">${isObra ? 'ID_' + point.process_number : 'ANO_' + workYear}</span>
                   </div>
-                  <h3 style="color: white; font-size: 13px; font-weight: 700; margin: 0;">${point.description_detailed}</h3>
+                  <h3 style="color: white; font-size: 15px; line-height: 1.4; font-weight: 800; margin: 0; letter-spacing: -0.02em;">${point.description_detailed}</h3>
+                  <div style="margin-top: 8px; font-size: 10px; font-weight: 600; color: #64748b;">
+                    ${isObra ? (point.technical_subfamily || 'Uso não especificado') : (point.agency)}
+                  </div>
                 </div>
-                <div style="padding: 15px; border-top: 1px solid rgba(255,255,255,0.05);">
-                  <div style="font-size: 11px; color: white; margin-bottom: 4px;">${point.company_name}</div>
-                  <div style="font-size: 10px; color: #64748b; margin-bottom: 8px;">${point.address}</div>
-                  <div style="background: rgba(255,255,255,0.05); padding: 8px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 16px; font-weight: 800; color: white;">${formatCurrency(point.contract_value)}</div>
+
+                <div style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                  <div>
+                    <div style="font-size: 9px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Responsável e Fiscalização</div>
+                    <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                      <div style="font-size: 11px; font-weight: 700; color: white; margin-bottom: 2px;">${point.company_name}</div>
+                      <div style="font-size: 9px; color: #64748b; font-family: 'JetBrains Mono', monospace; margin-bottom: 8px;">CNPJ: ${point.beneficiary_id || 'Não informado'}</div>
+                      
+                      ${point.fiscal_name ? `
+                      <div style="padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); display: flex; gap: 8px; align-items: center;">
+                        <div style="width: 20px; height: 20px; background: ${color}22; color: ${color}; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px;">👤</div>
+                        <div>
+                          <div style="font-size: 10px; font-weight: 700; color: #e2e8f0;">Fiscal: ${point.fiscal_name}</div>
+                          <div style="font-size: 8px; color: #64748b;">${point.fiscal_info}</div>
+                        </div>
+                      </div>` : ''}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style="font-size: 9px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Localização e Detalhes</div>
+                    <div style="display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 12px;">
+                      <div style="background: #1e293b; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 8px; color: ${color}; font-size: 14px;">📍</div>
+                      <div style="flex: 1;">
+                        <div style="font-size: 10px; font-weight: 700; color: #e2e8f0; line-height: 1.2;">${point.address || 'Porto Alegre, RS'}</div>
+                        <div style="font-size: 9px; color: #64748b; margin-top: 2px;">Data Ref: ${formattedDate}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style="background: #161b22; padding: 16px; border-radius: 16px; border: 1px solid ${color}33;">
+                      <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">${isObra ? 'Valor Estimado' : 'Valor Pago'}</div>
+                      <div style="font-size: 24px; font-weight: 900; color: white; letter-spacing: -0.04em;">
+                        ${point.contract_value && Number(point.contract_value) > 0 
+                          ? formatCurrency(point.contract_value) 
+                          : '<span style="color: #64748b; font-size: 14px;">Valor não informado</span>'}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

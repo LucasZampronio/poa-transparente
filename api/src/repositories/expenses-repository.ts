@@ -71,9 +71,9 @@ export const ExpensesRepository = {
         sd.orgao as agency,
         sd.data_empenho as reference_date,
         sd.cnpj_fornecedor as beneficiary_id,
-        NULL as address,
+        sd.orgao as address,
         NULL as fiscal_name,
-        NULL as fiscal_info,
+        'Órgão Responsável' as fiscal_info,
         NULL as technical_family,
         NULL as technical_subfamily,
         sd.num_empenho as process_number
