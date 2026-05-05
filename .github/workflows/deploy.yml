@@ -33,40 +33,60 @@ jobs:
     steps:
       - name: Deploy to OCI via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Passa o token do GitHub para a action
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
+          envs: GITHUB_TOKEN # Disponibiliza a variável no ambiente SSH
           script: |
-            # Verifica se o Git está instalado (fallback caso a VM seja nova)
+            # Verifica se o Git está instalado
             if ! command -v git &> /dev/null; then
-              echo "⚠️ Git não encontrado. Tentando instalação manual..."
-              sudo dnf install -y git || sudo apt-get update && sudo apt-get install -y git
+              echo "⚠️ Git não encontrado. Instalando..."
+              sudo dnf install -y git
             fi
+
+            # Monta a URL do repositório com o Token para autenticação
+            REPO_URL="https://oauth2:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
 
             # Clone ou Pull do repositório
             if [ ! -d "$HOME/poa-transparente" ]; then
               echo "🚀 Realizando clone inicial do repositório..."
-              git clone https://github.com/${{ github.repository }}.git "$HOME/poa-transparente"
+              git clone "$REPO_URL" "$HOME/poa-transparente"
             fi
             
             cd "$HOME/poa-transparente"
+            # Garante que o remote está usando o token mais atualizado
+            git remote set-url origin "$REPO_URL"
             git pull origin main
             
-            # Garante que o Docker está pronto
+            # Garante que o Docker está pronto (Instalação específica para Oracle Linux)
             if ! command -v docker &> /dev/null; then
-              echo "⚠️ Docker não encontrado. Instalando..."
-              curl -fsSL https://get.docker.com | sh
+              echo "⚠️ Docker não encontrado. Instalando para Oracle Linux..."
+              sudo dnf install -y dnf-utils
+              sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+              sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+              sudo systemctl enable --now docker
               sudo usermod -aG docker $USER
             fi
 
-            # Exporta variáveis de ambiente necessárias para o Docker Compose
+            # Descobre o IP Público da VM para o Frontend
+            PUBLIC_IP=$(curl -s https://ifconfig.me)
+            echo "🌐 IP Público Detectado: $PUBLIC_IP"
+
+            # Exporta variáveis para o Docker Compose
             export PORTAL_TRANSPARENCIA_API_KEY="${{ secrets.PORTAL_TRANSPARENCIA_API_KEY }}"
             export CONECTA_GOV_TOKEN="${{ secrets.CONECTA_GOV_TOKEN }}"
+            export VITE_API_URL="http://$PUBLIC_IP:4000"
             
+            # Tenta abrir o firewall interno (Oracle Linux / Ubuntu)
+            sudo firewall-cmd --permanent --add-port=5173/tcp &>/dev/null && sudo firewall-cmd --permanent --add-port=4000/tcp &>/dev/null && sudo firewall-cmd --reload &>/dev/null || true
+            sudo ufw allow 5173/tcp &>/dev/null && sudo ufw allow 4000/tcp &>/dev/null || true
+
             # Reconstroi e sobe os containers
-            sudo docker compose down
-            sudo docker compose up -d --build
+            sudo VITE_API_URL=$VITE_API_URL docker compose down
+            sudo VITE_API_URL=$VITE_API_URL docker compose up -d --build
             
             # Limpeza de imagens órfãs
             sudo docker image prune -f
