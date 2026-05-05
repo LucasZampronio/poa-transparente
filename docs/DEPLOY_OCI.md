@@ -15,24 +15,15 @@ Utilizamos a **Oracle Cloud Infrastructure (OCI)** para hospedar nossa stack, ap
 
 ---
 
-## 🤖 Automação e Resiliência (GitHub Actions)
-Devido à alta demanda pelas instâncias gratuitas da OCI, implementamos um sistema de **"Pesca de Instâncias"**:
-
-1. **Workflow de Provisionamento:** Localizado em `.github/workflows/oci-provision.yml`.
-2. **Lógica:** O GitHub Actions tenta criar a instância via CLI da OCI a cada hora.
-3. **Resiliência:** Quando a OCI retorna erro de `Out of Capacity`, o script registra a tentativa e aguarda o próximo ciclo, garantindo que "pescaremos" a primeira vaga disponível.
-
----
-
 ## 🛠️ Manutenção Pós-Deploy
 
 Para atualizar a aplicação em produção:
 1. Faça o `git push` para a branch `main`.
-2. Acesse a VM via SSH.
-3. Execute os comandos:
+2. O workflow `.github/workflows/deploy.yml` cuidará da atualização automática via SSH.
+3. Se precisar intervir manualmente:
    ```bash
-   cd poa-transparente
-   git pull
+   cd ~/poa-transparente
+   git pull origin main
    docker compose up -d --build
    ```
 

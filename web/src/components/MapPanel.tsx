@@ -179,7 +179,7 @@ export default function MapPanel({ points, loading, selectedSector, focusPoint }
           popup.current!
             .setLngLat([lng, lat])
             .setHTML(`
-              <div class="custom-popup-content" style="padding: 0; font-family: 'Inter', sans-serif; width: 320px; background: #0f1115; color: #cbd5e1; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);">
+              <div class="custom-popup-content" style="padding: 0; font-family: 'Inter', sans-serif; width: min(320px, 90vw); background: #0f1115; color: #cbd5e1; border-radius: 20px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.8);">
                 <div style="background: linear-gradient(to bottom right, ${color}33, transparent); padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.05);">
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="background: ${color}; color: white; padding: 4px 10px; border-radius: 8px; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em;">
@@ -254,7 +254,7 @@ export default function MapPanel({ points, loading, selectedSector, focusPoint }
       <div ref={mapContainer} className="h-full w-full" />
       
       {/* Engine Status Overlay */}
-      <div className="absolute top-20 left-6 z-50 bg-black/60 border border-white/5 p-4 rounded-3xl backdrop-blur-2xl shadow-2xl pointer-events-none min-w-[180px]">
+      <div className="absolute top-20 left-6 z-50 bg-black/60 border border-white/5 p-4 rounded-3xl backdrop-blur-2xl shadow-2xl pointer-events-none min-w-[180px] hidden lg:block">
         <div className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] mb-3 border-b border-white/5 pb-2">Spatial_Engine</div>
         <div className="space-y-2">
           <div className="flex justify-between items-center">

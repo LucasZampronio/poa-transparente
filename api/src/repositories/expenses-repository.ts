@@ -36,50 +36,38 @@ export const ExpensesRepository = {
     const result = await pool.query(`
       -- 1. Obras do TCE (Camada Gold Enriquecida)
       SELECT 
-        so.bairro as district, 
+        COALESCE(so.bairro, 'PORTO ALEGRE') as district, 
         so.latitude, 
         so.longitude, 
-        so.nome_obra as description_detailed,
-        COALESCE(so.valor_licitado, 0) as contract_value,
+        COALESCE(so.nome_obra, 'OBRA SEM DESCRIÇÃO') as description_detailed,
+        COALESCE(MAX(so.valor_licitado), 0) as contract_value,
         'INFRAESTRUTURA' as sector,
         'OBRA' as type,
-        COALESCE(so.contratada_nome, 'MÚLTIPLAS EMPRESAS') as company_name,
-        so.orgao as agency,
-        so.data_inicio as reference_date,
-        so.contratada_cnpj as beneficiary_id,
-        COALESCE(so.logradouro, so.bairro) as address,
-        so.fiscal_nome as fiscal_name,
-        'Setor Fiscal: ' || so.orgao as fiscal_info,
+        COALESCE(
+          CASE 
+            WHEN COUNT(DISTINCT so.contratada_nome) > 1 THEN STRING_AGG(DISTINCT so.contratada_nome, ', ')
+            ELSE MAX(so.contratada_nome)
+          END, 
+          'EMPRESA NÃO INFORMADA'
+        ) as company_name,
+        COALESCE(so.orgao, 'PREFEITURA POA') as agency,
+        COALESCE(so.data_inicio::text, 'N/A') as reference_date,
+        COALESCE(
+          CASE 
+            WHEN COUNT(DISTINCT so.contratada_cnpj) > 1 THEN 'MÚLTIPLOS'
+            ELSE MAX(so.contratada_cnpj)
+          END,
+          'N/A'
+        ) as beneficiary_id,
+        COALESCE(MAX(so.logradouro), so.bairro, 'PORTO ALEGRE') as address,
+        COALESCE(MAX(so.fiscal_nome), 'NÃO INFORMADO') as fiscal_name,
+        'Setor Fiscal: ' || COALESCE(so.orgao, 'PREFEITURA POA') as fiscal_info,
         NULL as technical_family,
-        so.finalidade as technical_subfamily,
+        COALESCE(MAX(so.finalidade), 'N/A') as technical_subfamily,
         so.external_id::text as process_number
       FROM silver_obras so
       WHERE so.latitude IS NOT NULL AND so.longitude IS NOT NULL
-
-      UNION ALL
-
-      -- 2. Todas as Despesas Geocalizadas
-      SELECT 
-        'PORTO ALEGRE' as district,
-        sd.latitude, 
-        sd.longitude, 
-        sd.descricao as description_detailed,
-        sd.valor_pago as contract_value,
-        'SERVIÇOS/CONSUMO' as sector,
-        'GASTO' as type,
-        sd.nome_fornecedor as company_name,
-        sd.orgao as agency,
-        sd.data_empenho as reference_date,
-        sd.cnpj_fornecedor as beneficiary_id,
-        sd.orgao as address,
-        NULL as fiscal_name,
-        'Órgão Responsável' as fiscal_info,
-        NULL as technical_family,
-        NULL as technical_subfamily,
-        sd.num_empenho as process_number
-      FROM silver_despesas sd
-      WHERE sd.latitude IS NOT NULL AND sd.longitude IS NOT NULL
-      
+      GROUP BY so.external_id, so.nome_obra, so.bairro, so.latitude, so.longitude, so.orgao, so.data_inicio
       ORDER BY type DESC, reference_date DESC, contract_value DESC NULLS LAST
     `);
     return result.rows;
@@ -111,7 +99,7 @@ export const ExpensesRepository = {
 
   async getTopExpenses() {
     const result = await pool.query(`
-      (SELECT 
+      SELECT 
         nome_obra as description, 
         COALESCE(contratada_nome, 'MÚLTIPLAS EMPRESAS') as company_name,
         ROUND(valor_licitado::numeric, 2) AS amount,
@@ -120,21 +108,7 @@ export const ExpensesRepository = {
         latitude,
         longitude
       FROM silver_obras 
-      WHERE valor_licitado > 0)
-
-      UNION ALL
-
-      (SELECT 
-        descricao as description, 
-        nome_fornecedor as company_name,
-        ROUND(valor_pago::numeric, 2) AS amount,
-        orgao as agency,
-        'DESPESA' as type,
-        latitude,
-        longitude
-      FROM silver_despesas 
-      WHERE valor_pago > 0)
-
+      WHERE valor_licitado > 0
       ORDER BY amount DESC 
       LIMIT 10
     `);

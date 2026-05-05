@@ -51,6 +51,10 @@
 }
 
 /* MapLibre Popup Overrides */
+.maplibregl-popup {
+  z-index: 2000 !important;
+}
+
 .maplibregl-popup-content {
   background: transparent !important;
   padding: 0 !important;

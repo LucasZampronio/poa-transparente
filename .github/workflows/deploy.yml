@@ -38,15 +38,35 @@ jobs:
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
           script: |
-            cd ~/poa-transparente
+            # Verifica se o Git está instalado (fallback caso a VM seja nova)
+            if ! command -v git &> /dev/null; then
+              echo "⚠️ Git não encontrado. Tentando instalação manual..."
+              sudo dnf install -y git || sudo apt-get update && sudo apt-get install -y git
+            fi
+
+            # Clone ou Pull do repositório
+            if [ ! -d "$HOME/poa-transparente" ]; then
+              echo "🚀 Realizando clone inicial do repositório..."
+              git clone https://github.com/${{ github.repository }}.git "$HOME/poa-transparente"
+            fi
+            
+            cd "$HOME/poa-transparente"
             git pull origin main
             
-            # Exporta variáveis de ambiente necessárias
+            # Garante que o Docker está pronto
+            if ! command -v docker &> /dev/null; then
+              echo "⚠️ Docker não encontrado. Instalando..."
+              curl -fsSL https://get.docker.com | sh
+              sudo usermod -aG docker $USER
+            fi
+
+            # Exporta variáveis de ambiente necessárias para o Docker Compose
             export PORTAL_TRANSPARENCIA_API_KEY="${{ secrets.PORTAL_TRANSPARENCIA_API_KEY }}"
+            export CONECTA_GOV_TOKEN="${{ secrets.CONECTA_GOV_TOKEN }}"
             
             # Reconstroi e sobe os containers
-            docker compose down
-            docker compose up -d --build
+            sudo docker compose down
+            sudo docker compose up -d --build
             
-            # Limpeza de imagens órfãs para economizar disco na VM Always Free
-            docker image prune -f
+            # Limpeza de imagens órfãs
+            sudo docker image prune -f
