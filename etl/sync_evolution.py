@@ -17,16 +17,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://poa:poa@localhost:5432/po
 CNPJ_POA = "92963560000160"
 MUNICIPIO_CODE = "88301"
 
-def clean_text(text):
-    if not text or pd.isna(text): return ""
-    text = str(text).lower()
-    nfkd_form = unicodedata.normalize('NFKD', text)
-    text = "".join([c for c in nfkd_form if not unicodedata.combining(c)])
-    text = re.sub(r'[^a-z0-9 ]', ' ', text)
-    return " ".join(text.split())
-
 def sync_silver_obras():
-    print("📡 Syncing silver_obras from TCE-RS (Memory-Optimized)...")
+    print("📡 Syncing silver_obras from TCE-RS (Mapeamento Real)...")
     geo_cache = load_geo_cache()
     company_cache = load_company_cache()
     
@@ -36,7 +28,6 @@ def sync_silver_obras():
     geocoded_count = 0
     total_processed = 0
 
-    # Processamos ano a ano para não estourar a memória (OOM 137 fix)
     for year in [2026, 2025, 2024, 2023, 2022]:
         print(f"📅 Processing year: {year}")
         works_year = get_works(year)
@@ -48,21 +39,24 @@ def sync_silver_obras():
             ext_id = w.get('idObra')
             if not ext_id:
                 continue
-            
-            if i == 0:
-                print(f"🔍 DEBUG: Sample record keys for {year}: {list(w.keys())}")
-                print(f"🔍 DEBUG: Sample record content: {w}")
                 
-            nome = smart_clean(w.get('objeto', w.get('nomeObra', 'Obra Sem Nome')))
-            bairro = normalize_bairro(w.get('localizacao', {}).get('bairro', 'Centro Histórico'))
-            valor = w.get('valorTotal', w.get('valorLicitado', 0))
-            rua = smart_clean(w.get('localizacao', {}).get('logradouro', ''))
+            # --- MAPEAMENTO CORRIGIDO BASEADO NO DEBUG ---
+            # Nome da obra vem em 'descricaoObjeto'
+            nome = smart_clean(w.get('descricaoObjeto', 'Obra Sem Nome'))
+            
+            # Localização e Bairro
+            loc = w.get('localizacao', {})
+            bairro = normalize_bairro(loc.get('bairro', 'Centro Histórico'))
+            rua = smart_clean(loc.get('logradouro', ''))
+            
+            # Valor: Tenta valorTotal, valorContrato ou usa o valor da garantia como estimativa se nada mais existir
+            valor = w.get('valorTotal', w.get('valorContrato', w.get('valorGarantiaObra', 0)))
             
             # Contractor info
             cnpj = str(w.get('documentoContratada', '')).strip()
             nome_empresa = get_company_name(cnpj, company_cache) if cnpj else "N/A"
 
-            # Fiscal e Uso
+            # Fiscal e Detalhes
             fiscal_nome, fiscal_info = get_responsaveis(ext_id)
             finalidade = ", ".join(w.get('caracteristicas', [])) if w.get('caracteristicas') else "N/A"
 
@@ -76,15 +70,15 @@ def sync_silver_obras():
             if lat: geocoded_count += 1
 
             situacao = w.get('situacaoObra', 'N/A')
+            # Órgão pode estar dentro de contrato
             orgao = w.get('contrato', {}).get('nomeOrgao', 'PREFEITURA POA')
             
             # Datas
-            ano_exercicio = int(w.get('exercicio', year))
             data_inicio_raw = w.get('dataValidadeGarantiaObra') 
             try:
-                data_inicio = datetime.fromisoformat(data_inicio_raw) if data_inicio_raw else datetime(ano_exercicio, 1, 1)
+                data_inicio = datetime.fromisoformat(data_inicio_raw) if data_inicio_raw else datetime(year, 1, 1)
             except:
-                data_inicio = datetime(ano_exercicio, 1, 1)
+                data_inicio = datetime(year, 1, 1)
 
             cur.execute("""
                 INSERT INTO silver_obras (
@@ -114,7 +108,6 @@ def sync_silver_obras():
                 conn.commit()
                 print(f"📑 Progress: {total_processed} works synced so far...")
 
-        # Limpeza explícita de memória para o próximo ano
         del works_year
         
     conn.commit()
@@ -127,13 +120,12 @@ def sync_silver_despesas():
     url = "https://dadosabertos.poa.br/dataset/0a376fbb-4c35-4e51-93d0-ef05f32ff1e5/resource/e08dcf9a-9496-4540-a88a-10af1c4779ce/download/licitacon.csv"
     try:
         df = pd.read_csv(url, sep=';', encoding='utf-8')
-        df = df[df['ano_licitacao'].isin([2024, 2025])] # Filtro para ser mais rápido
+        df = df[df['ano_licitacao'].isin([2024, 2025])]
         
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         
         for i, row in df.head(2000).iterrows():
-            # Inserção simplificada para popular o Dashboard
             cur.execute("""
                 INSERT INTO silver_despesas (num_empenho, data_empenho, valor_pago, descricao, cnpj_fornecedor, nome_fornecedor, orgao)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -146,12 +138,10 @@ def sync_silver_despesas():
         conn.commit()
         cur.close()
         conn.close()
-        print(f"✅ Synced {len(df.head(2000))} expenses.")
     except Exception as e:
         print(f"❌ Error syncing expenses: {e}")
 
 def run_matching():
-    # Lógica simplificada de matching para popular as tabelas vinculadas
     print("🧠 Running matching logic...")
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
@@ -164,4 +154,4 @@ if __name__ == "__main__":
     sync_silver_obras()
     sync_silver_despesas()
     run_matching()
-    aggregate_gold_data() # Chama a função importada do etl.gold.aggregators
+    aggregate_gold_data()
