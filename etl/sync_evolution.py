@@ -11,10 +11,19 @@ from etl.ingestion.nominatim import get_coords_from_address
 from etl.ingestion.open_cnpj import get_company_name
 from etl.utils.db import load_geo_cache, load_company_cache
 from etl.silver.cleaners import normalize_bairro, smart_clean
+from etl.gold.aggregators import aggregate_gold_data
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://poa:poa@localhost:5432/poa_transparente")
 CNPJ_POA = "92963560000160"
 MUNICIPIO_CODE = "88301"
+
+def clean_text(text):
+    if not text or pd.isna(text): return ""
+    text = str(text).lower()
+    nfkd_form = unicodedata.normalize('NFKD', text)
+    text = "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+    text = re.sub(r'[^a-z0-9 ]', ' ', text)
+    return " ".join(text.split())
 
 def sync_silver_obras():
     print("📡 Syncing silver_obras from TCE-RS (Memory-Optimized)...")
@@ -107,11 +116,48 @@ def sync_silver_obras():
     conn.commit()
     cur.close()
     conn.close()
-    print(f"✅ Finished. Total processed: {total_processed}. Geocoded: {geocoded_count}")
+    print(f"✅ Finished Syncing Works. Total: {total_processed}")
 
-def sync_silver_despesas(): pass
-def run_matching(): pass
-def populate_gold(): pass
+def sync_silver_despesas():
+    print("📡 Syncing silver_despesas from POA Open Data...")
+    url = "https://dadosabertos.poa.br/dataset/0a376fbb-4c35-4e51-93d0-ef05f32ff1e5/resource/e08dcf9a-9496-4540-a88a-10af1c4779ce/download/licitacon.csv"
+    try:
+        df = pd.read_csv(url, sep=';', encoding='utf-8')
+        df = df[df['ano_licitacao'].isin([2024, 2025])] # Filtro para ser mais rápido
+        
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        
+        for i, row in df.head(2000).iterrows():
+            # Inserção simplificada para popular o Dashboard
+            cur.execute("""
+                INSERT INTO silver_despesas (num_empenho, data_empenho, valor_pago, descricao, cnpj_fornecedor, nome_fornecedor, orgao)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING
+            """, (row.get('num_licitacao'), datetime(int(row['ano_licitacao']), 1, 1), 
+                  float(str(row.get('valor_homologado', 0)).replace(',', '.')), 
+                  row.get('desc_objeto'), str(row.get('fornec_venc_cnpj_cpf')), 
+                  row.get('fornec_vencedor'), row.get('orgao_demandante')))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"✅ Synced {len(df.head(2000))} expenses.")
+    except Exception as e:
+        print(f"❌ Error syncing expenses: {e}")
+
+def run_matching():
+    # Lógica simplificada de matching para popular as tabelas vinculadas
+    print("🧠 Running matching logic...")
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
+    cur.execute("INSERT INTO obra_despesa_match (obra_id, despesa_id, score, confianca) SELECT o.id, d.id, 100, 'alta' FROM silver_obras o, silver_despesas d WHERE d.descricao ILIKE '%' || o.nome_obra || '%' ON CONFLICT DO NOTHING")
+    conn.commit()
+    cur.close()
+    conn.close()
 
 if __name__ == "__main__":
     sync_silver_obras()
+    sync_silver_despesas()
+    run_matching()
+    aggregate_gold_data() # Chama a função importada do etl.gold.aggregators
