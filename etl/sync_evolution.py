@@ -18,11 +18,10 @@ MUNICIPIO_CODE = "88301"
 def log_memory():
     process = psutil.Process(os.getpid())
     mem = process.memory_info().rss / 1024 / 1024
-    print(f"🧠 RAM Usage: {mem:.2f} MB")
+    print(f"   🧠 RAM: {mem:.2f} MB")
 
 def sync_silver_obras():
-    print("📡 Syncing silver_obras (Performance Mode)...")
-    log_memory()
+    print("📡 Syncing silver_obras (Verbose Mode)...")
     geo_cache = load_geo_cache()
     
     conn = psycopg2.connect(DATABASE_URL)
@@ -34,21 +33,30 @@ def sync_silver_obras():
     for year in [2026, 2025, 2024, 2023, 2022]:
         print(f"📅 Year: {year}")
         works_year = get_works(year) 
-        log_memory()
         
-        if not works_year: continue
+        if not works_year: 
+            print(f"   ∅ No works found for {year}")
+            continue
+
+        print(f"   📦 Found {len(works_year)} works. Starting sync...")
 
         for i, w in enumerate(works_year):
             ext_id = w.get('idObra')
             if not ext_id: continue
                 
             nome = smart_clean(w.get('descricaoObjeto', 'Obra Sem Nome'))
+            print(f"   🚜 [{total_processed + 1}] Processing: {nome[:50]}...")
+            
             loc = w.get('localizacao', {})
             bairro = normalize_bairro(loc.get('bairro', 'Centro Histórico'))
             rua = smart_clean(loc.get('logradouro', ''))
             valor = w.get('valorTotal', w.get('valorContrato', w.get('valorGarantiaObra', 0)))
             
+            # Detalhes (chamadas de API individuais - Timeout curto para não travar)
+            # Nota: get_responsaveis e get_coordinates estão em etl/ingestion/tce.py
+            fiscal_nome, fiscal_info = get_responsaveis(ext_id)
             coords = get_coordinates(ext_id)
+            
             if not coords:
                 full_address = f"{rua}, {bairro}, Porto Alegre"
                 coords = geo_cache.get(full_address) or get_coords_from_address(full_address, geo_cache)
@@ -74,30 +82,22 @@ def sync_silver_obras():
                   datetime(year, 1, 1)))
 
             total_processed += 1
-            if total_processed % 10 == 0:
+            # Commit a cada 5 obras para o usuário ver progresso no DB/Frontend
+            if total_processed % 5 == 0:
                 conn.commit()
-                print(f"📑 Progress: {total_processed} works synced... ", end="")
                 log_memory()
-
-
-
-
-
-
 
         del works_year
         
     conn.commit()
     cur.close()
     conn.close()
-    print(f"✅ Sync Finished. Total: {total_processed}")
+    print(f"✅ Sync Finished. Total: {total_processed} Geocoded: {geocoded_count}")
 
 def sync_silver_despesas():
-    # Restaurado para evitar ImportError no main.py
     print("📡 Syncing silver_despesas (Placeholder)...")
     pass
 
 if __name__ == "__main__":
     sync_silver_obras()
-    sync_silver_despesas()
     aggregate_gold_data()
