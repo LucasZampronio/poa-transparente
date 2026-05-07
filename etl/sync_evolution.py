@@ -4,6 +4,7 @@ import psycopg2
 import unicodedata
 import re
 import psutil
+import sys
 from datetime import datetime
 from etl.ingestion.tce import get_coordinates, get_responsaveis, get_works
 from etl.ingestion.nominatim import get_coords_from_address
@@ -18,10 +19,10 @@ MUNICIPIO_CODE = "88301"
 def log_memory():
     process = psutil.Process(os.getpid())
     mem = process.memory_info().rss / 1024 / 1024
-    print(f"🧠 RAM Usage: {mem:.2f} MB", flush=True)
+    print(f"   🧠 RAM Usage: {mem:.2f} MB", flush=True)
 
 def sync_silver_obras():
-    print("📡 Syncing silver_obras (Verbose Performance Mode)...", flush=True)
+    print("📡 Syncing silver_obras (ULTRA-VERBOSE MODE)...", flush=True)
     log_memory()
     geo_cache = load_geo_cache()
     
@@ -34,22 +35,19 @@ def sync_silver_obras():
     for year in [2026, 2025, 2024, 2023, 2022]:
         print(f"📅 Year: {year}", flush=True)
         works_year = get_works(year) 
-        log_memory()
         
         if not works_year: 
             print(f"   ∅ No works found for {year}", flush=True)
             continue
 
-        print(f"   📦 Found {len(works_year)} works. Processing...", flush=True)
+        print(f"   📦 Found {len(works_year)} works. Starting sync...", flush=True)
 
         for i, w in enumerate(works_year):
             ext_id = w.get('idObra')
             if not ext_id: continue
                 
             nome = smart_clean(w.get('descricaoObjeto', 'Obra Sem Nome'))
-            
-            # Feedback a cada obra para o usuário não achar que travou
-            print(f"   🚜 [{i+1}/{len(works_year)}] Syncing: {nome[:50]}...", flush=True)
+            print(f"   🚜 [{total_processed + 1}/{len(works_year)}] Processing: {nome[:50]}...", flush=True)
             
             loc = w.get('localizacao', {})
             bairro = normalize_bairro(loc.get('bairro', 'Centro Histórico'))
@@ -57,13 +55,16 @@ def sync_silver_obras():
             valor = w.get('valorTotal', w.get('valorContrato', w.get('valorGarantiaObra', 0)))
             
             # Detalhes (chamadas de API individuais)
-            # Nota: Isso pode ser lento dependendo da resposta do TCE-RS
+            print(f"      📡 Fetching details for work {ext_id}...", end="", flush=True)
             fiscal_nome, fiscal_info = get_responsaveis(ext_id)
             coords = get_coordinates(ext_id)
+            print(" Done.", flush=True)
             
             if not coords:
                 full_address = f"{rua}, {bairro}, Porto Alegre"
+                print(f"      📍 Geocoding via Nominatim: {full_address[:40]}...", end="", flush=True)
                 coords = geo_cache.get(full_address) or get_coords_from_address(full_address, geo_cache)
+                print(" Done.", flush=True)
 
             lat, lng = coords if coords else (None, None)
             if lat: geocoded_count += 1
@@ -86,8 +87,9 @@ def sync_silver_obras():
                   datetime(year, 1, 1)))
 
             total_processed += 1
+            # Commit a cada obra para visibilidade imediata no frontend
+            conn.commit()
             if total_processed % 5 == 0:
-                conn.commit()
                 log_memory()
 
         del works_year
@@ -95,7 +97,7 @@ def sync_silver_obras():
     conn.commit()
     cur.close()
     conn.close()
-    print(f"✅ Sync Finished. Total: {total_processed}", flush=True)
+    print(f"✅ Sync Finished. Total: {total_processed} Geocoded: {geocoded_count}", flush=True)
 
 def sync_silver_despesas():
     print("📡 Syncing silver_despesas (Placeholder)...", flush=True)
@@ -103,5 +105,4 @@ def sync_silver_despesas():
 
 if __name__ == "__main__":
     sync_silver_obras()
-    sync_silver_despesas()
     aggregate_gold_data()
