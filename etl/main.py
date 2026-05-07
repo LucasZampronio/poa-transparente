@@ -1,10 +1,11 @@
 import sys
 import os
 
-# No Docker, os arquivos do diretório /etl são copiados para /app.
-# Portanto, os módulos estão na raiz do PYTHONPATH.
-from sync_evolution import sync_silver_obras, sync_silver_despesas
-from gold.aggregators import aggregate_gold_data
+# Garantir que o diretório raiz do projeto esteja no path para imports relativos
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from etl.sync_evolution import sync_silver_obras, sync_silver_despesas
+from etl.gold.aggregators import aggregate_gold_data
 
 def sync_pipeline():
     print("--- 🚀 INICIANDO PIPELINE ETL MEDALLION ---")
