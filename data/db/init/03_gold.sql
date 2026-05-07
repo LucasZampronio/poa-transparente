@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS gold_gastos_por_bairro (
 CREATE TABLE IF NOT EXISTS gold_top_agencies (
     agency TEXT PRIMARY KEY,
     total_spent NUMERIC(14,2),
-    quantidade_obras INT
+    quantidade_contratos INT
 );
 
 -- Série Temporal de Gastos

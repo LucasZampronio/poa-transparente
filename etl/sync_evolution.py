@@ -52,6 +52,7 @@ def sync_silver_obras():
             loc = w.get('localizacao', {})
             bairro = normalize_bairro(loc.get('bairro', 'Centro Histórico'))
             rua = smart_clean(loc.get('logradouro', ''))
+            cep = str(loc.get('cep', '')).strip().replace('-', '')
             valor = w.get('valorTotal', w.get('valorContrato', w.get('valorGarantiaObra', 0)))
             
             # Detalhes (chamadas de API individuais)
@@ -61,10 +62,41 @@ def sync_silver_obras():
             print(" Done.", flush=True)
             
             if not coords:
-                full_address = f"{rua}, {bairro}, Porto Alegre"
-                print(f"      📍 Geocoding via Nominatim: {full_address[:40]}...", end="", flush=True)
-                coords = geo_cache.get(full_address) or get_coords_from_address(full_address, geo_cache)
-                print(" Done.", flush=True)
+                # 1ª Tentativa: CEP + Logradouro (Mais preciso)
+                if cep and cep != "0" and rua and rua != "N/A":
+                    cep_address = f"{rua}, {cep}, Brazil"
+                    print(f"      📍 Geocoding by CEP+Street: {cep_address[:40]}...", end="", flush=True)
+                    coords = geo_cache.get(cep_address) or get_coords_from_address(cep_address, geo_cache)
+                    if coords: print(" Success!", flush=True)
+                    else: print(" Failed.", flush=True)
+                    import time
+                    time.sleep(1)
+
+                # 2ª Tentativa: Endereço completo (Fallback padrão)
+                if not coords and rua and rua != "N/A":
+                    full_address = f"{rua}, {bairro}, Porto Alegre"
+                    print(f"      📍 Geocoding by Address: {full_address[:40]}...", end="", flush=True)
+                    coords = geo_cache.get(full_address) or get_coords_from_address(full_address, geo_cache)
+                    if coords: print(" Success!", flush=True)
+                    else: print(" Failed.", flush=True)
+                    import time
+                    time.sleep(1)
+                
+                # 3ª Tentativa: Apenas o bairro (Último recurso para garantir presença no mapa)
+                if not coords:
+                    fallback_address = f"{bairro}, Porto Alegre"
+                    print(f"      📍 Fallback to Neighborhood: {fallback_address}...", end="", flush=True)
+                    coords = geo_cache.get(fallback_address) or get_coords_from_address(fallback_address, geo_cache)
+                    if coords:
+                        import random
+                        # Jitter para evitar sobreposição no centro do bairro
+                        coords = (coords[0] + random.uniform(-0.001, 0.001), 
+                                 coords[1] + random.uniform(-0.001, 0.001))
+                        print(" Success (with jitter)!", flush=True)
+                    else:
+                        print(" Total failure.", flush=True)
+                    import time
+                    time.sleep(1)
 
             lat, lng = coords if coords else (None, None)
             if lat: geocoded_count += 1

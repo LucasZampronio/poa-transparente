@@ -13,6 +13,16 @@ def aggregate_gold_data():
                         quantidade_contratos INT
                     )
                 """)
+                # Migração automática se a coluna antiga existir
+                cur.execute("""
+                    DO $$ 
+                    BEGIN 
+                        IF EXISTS (SELECT 1 FROM information_schema.columns 
+                                   WHERE table_name='gold_top_agencies' AND column_name='quantidade_obras') THEN
+                            ALTER TABLE gold_top_agencies RENAME COLUMN quantidade_obras TO quantidade_contratos;
+                        END IF;
+                    END $$;
+                """)
 
                 # 1. Gastos por Bairro
                 cur.execute("""
