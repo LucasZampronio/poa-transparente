@@ -33,7 +33,7 @@ def sync_silver_obras():
 
     for year in [2026, 2025, 2024, 2023, 2022]:
         print(f"📅 Year: {year}")
-        works_year = get_works(year) # Agora usamos a função de paginação real
+        works_year = get_works(year) 
         log_memory()
         
         if not works_year: continue
@@ -86,6 +86,12 @@ def sync_silver_obras():
     conn.close()
     print(f"✅ Sync Finished. Total: {total_processed}")
 
+def sync_silver_despesas():
+    # Restaurado para evitar ImportError no main.py
+    print("📡 Syncing silver_despesas (Placeholder)...")
+    pass
+
 if __name__ == "__main__":
     sync_silver_obras()
+    sync_silver_despesas()
     aggregate_gold_data()
