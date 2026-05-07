@@ -74,10 +74,11 @@ def sync_silver_obras():
                   datetime(year, 1, 1)))
 
             total_processed += 1
-            if total_processed % 10 == 0:
+            if total_processed % 5 == 0:
                 conn.commit()
-                print(f"📑 Progress: {total_processed} works synced. ", end="")
+                print(f"📑 Progress: {total_processed} works synced... ", end="")
                 log_memory()
+
 
 
 
