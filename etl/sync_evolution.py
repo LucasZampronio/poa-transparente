@@ -48,6 +48,10 @@ def sync_silver_obras():
             ext_id = w.get('idObra')
             if not ext_id:
                 continue
+            
+            if i == 0:
+                print(f"🔍 DEBUG: Sample record keys for {year}: {list(w.keys())}")
+                print(f"🔍 DEBUG: Sample record content: {w}")
                 
             nome = smart_clean(w.get('objeto', w.get('nomeObra', 'Obra Sem Nome')))
             bairro = normalize_bairro(w.get('localizacao', {}).get('bairro', 'Centro Histórico'))
