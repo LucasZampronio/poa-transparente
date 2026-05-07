@@ -9,7 +9,12 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./db/init:/docker-entrypoint-initdb.d
+      - ./data/db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poa -d poa_transparente"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   etl:
     build:
@@ -17,9 +22,9 @@ services:
     container_name: poa-etl
     environment:
       DATABASE_URL: postgresql://poa:poa@postgres:5432/poa_transparente
-    command: tail -f /dev/null
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   api:
     build:
