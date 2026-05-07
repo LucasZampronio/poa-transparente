@@ -6,7 +6,7 @@ import unicodedata
 import re
 from rapidfuzz import fuzz
 from datetime import datetime
-from etl.ingestion.tce import get_coordinates, get_responsaveis
+from etl.ingestion.tce import get_coordinates, get_responsaveis, get_works
 from etl.ingestion.nominatim import get_coords_from_address
 from etl.ingestion.open_cnpj import get_company_name
 from etl.utils.db import load_geo_cache, load_company_cache
@@ -29,13 +29,21 @@ def sync_silver_obras():
     geo_cache = load_geo_cache()
     company_cache = load_company_cache()
     all_works = []
+    
+    # 1. Busca obras de vários anos usando a função que lida com paginação
     for year in [2026, 2025, 2024, 2023, 2022]:
-        url = f"https://portal.tce.rs.gov.br/api/obras/v1/orgaos/{CNPJ_POA}/obras?municipio={MUNICIPIO_CODE}&exercicio={year}&page=0&size=100"
-        try:
-            resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20)
-            if resp.status_code == 200:
-                all_works.extend(resp.json().get('content', []))
-        except: pass
+        works_year = get_works(year)
+        all_works.extend(works_year)
+
+    if not all_works:
+        print("⚠️ No works found in TCE API.")
+        return
+
+    print(f"📦 Total works fetched from API: {len(all_works)}")
+    
+    # Log de debug para o primeiro registro (ajuda a mapear campos se falhar)
+    if len(all_works) > 0:
+        print(f"🔍 Debug: First record sample keys: {list(all_works[0].keys())}")
 
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
@@ -46,18 +54,20 @@ def sync_silver_obras():
         if not ext_id:
             continue
             
-        nome = smart_clean(w.get('nomeObra', 'Obra Sem Nome'))
+        # Mapeamento robusto: a API do TCE às vezes usa 'objeto' no lugar de 'nomeObra'
+        nome = smart_clean(w.get('objeto', w.get('nomeObra', 'Obra Sem Nome')))
         bairro = normalize_bairro(w.get('localizacao', {}).get('bairro', 'Centro Histórico'))
-        valor = w.get('valorLicitado')
+        
+        # Valor: tenta vários campos comuns em APIs do TCE
+        valor = w.get('valorTotal', w.get('valorLicitado', 0))
         
         rua = smart_clean(w.get('localizacao', {}).get('logradouro', ''))
-        cep = w.get('localizacao', {}).get('cep', '')
         
         # Contractor info
         cnpj = str(w.get('documentoContratada', '')).strip()
         nome_empresa = get_company_name(cnpj, company_cache) if cnpj else "N/A"
 
-        # Fiscal e Uso
+        # Fiscal e Uso (Detalhes extras)
         fiscal_nome, fiscal_info = get_responsaveis(ext_id)
         finalidade = ", ".join(w.get('caracteristicas', [])) if w.get('caracteristicas') else "N/A"
 
@@ -74,7 +84,7 @@ def sync_silver_obras():
         situacao = w.get('situacaoObra', 'N/A')
         orgao = w.get('contrato', {}).get('nomeOrgao', 'PREFEITURA POA')
         
-        # Datas reais
+        # Datas
         ano_exercicio = int(w.get('exercicio', datetime.now().year))
         data_inicio_raw = w.get('dataValidadeGarantiaObra') 
         try:
@@ -91,6 +101,7 @@ def sync_silver_obras():
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (external_id) DO UPDATE SET
                 valor_licitado = EXCLUDED.valor_licitado,
+                nome_obra = EXCLUDED.nome_obra,
                 logradouro = EXCLUDED.logradouro,
                 latitude = COALESCE(EXCLUDED.latitude, silver_obras.latitude),
                 longitude = COALESCE(EXCLUDED.longitude, silver_obras.longitude),
@@ -114,16 +125,12 @@ def sync_silver_obras():
     print(f"✅ Synced {len(all_works)} works. Geocoded: {geocoded_count}")
 
 def sync_silver_despesas():
-    # Mantendo a lógica anterior, mas garantindo robustez
+    # Placeholder para manter compatibilidade, será implementado conforme necessário
     print("📡 Syncing silver_despesas from POA Open Data...")
-    # ... (resto da função sync_silver_despesas mantida conforme original mas corrigida internamente)
     pass
 
-# Funções run_matching e populate_gold mantidas para compatibilidade com o pipeline
 def run_matching(): pass
 def populate_gold(): pass
 
 if __name__ == "__main__":
     sync_silver_obras()
-    # Desativado temporariamente para focar na correção de Obras
-    # sync_silver_despesas()
