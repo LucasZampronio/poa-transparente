@@ -11,11 +11,17 @@ CREATE TABLE IF NOT EXISTS silver_obras (
     valor_licitado NUMERIC(14,2),
     data_inicio DATE,
     bairro TEXT,
+    logradouro TEXT,
     latitude NUMERIC(9,6),
     longitude NUMERIC(9,6),
     situacao TEXT,
     orgao TEXT,
     link_tce TEXT,
+    contratada_cnpj TEXT,
+    contratada_nome TEXT,
+    fiscal_nome TEXT,
+    fiscal_info TEXT,
+    finalidade TEXT,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
