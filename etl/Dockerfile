@@ -11,6 +11,7 @@ COPY . ./etl/
 
 # Define o PYTHONPATH para a raiz onde a pasta etl reside
 ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
 
 # Executa o script através do módulo para que os imports funcionem
 CMD ["python", "etl/main.py"]
