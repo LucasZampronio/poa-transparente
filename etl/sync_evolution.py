@@ -18,10 +18,11 @@ MUNICIPIO_CODE = "88301"
 def log_memory():
     process = psutil.Process(os.getpid())
     mem = process.memory_info().rss / 1024 / 1024
-    print(f"   🧠 RAM: {mem:.2f} MB")
+    print(f"🧠 RAM Usage: {mem:.2f} MB", flush=True)
 
 def sync_silver_obras():
-    print("📡 Syncing silver_obras (Verbose Mode)...")
+    print("📡 Syncing silver_obras (Verbose Performance Mode)...", flush=True)
+    log_memory()
     geo_cache = load_geo_cache()
     
     conn = psycopg2.connect(DATABASE_URL)
@@ -31,29 +32,32 @@ def sync_silver_obras():
     total_processed = 0
 
     for year in [2026, 2025, 2024, 2023, 2022]:
-        print(f"📅 Year: {year}")
+        print(f"📅 Year: {year}", flush=True)
         works_year = get_works(year) 
+        log_memory()
         
         if not works_year: 
-            print(f"   ∅ No works found for {year}")
+            print(f"   ∅ No works found for {year}", flush=True)
             continue
 
-        print(f"   📦 Found {len(works_year)} works. Starting sync...")
+        print(f"   📦 Found {len(works_year)} works. Processing...", flush=True)
 
         for i, w in enumerate(works_year):
             ext_id = w.get('idObra')
             if not ext_id: continue
                 
             nome = smart_clean(w.get('descricaoObjeto', 'Obra Sem Nome'))
-            print(f"   🚜 [{total_processed + 1}] Processing: {nome[:50]}...")
+            
+            # Feedback a cada obra para o usuário não achar que travou
+            print(f"   🚜 [{i+1}/{len(works_year)}] Syncing: {nome[:50]}...", flush=True)
             
             loc = w.get('localizacao', {})
             bairro = normalize_bairro(loc.get('bairro', 'Centro Histórico'))
             rua = smart_clean(loc.get('logradouro', ''))
             valor = w.get('valorTotal', w.get('valorContrato', w.get('valorGarantiaObra', 0)))
             
-            # Detalhes (chamadas de API individuais - Timeout curto para não travar)
-            # Nota: get_responsaveis e get_coordinates estão em etl/ingestion/tce.py
+            # Detalhes (chamadas de API individuais)
+            # Nota: Isso pode ser lento dependendo da resposta do TCE-RS
             fiscal_nome, fiscal_info = get_responsaveis(ext_id)
             coords = get_coordinates(ext_id)
             
@@ -82,7 +86,6 @@ def sync_silver_obras():
                   datetime(year, 1, 1)))
 
             total_processed += 1
-            # Commit a cada 5 obras para o usuário ver progresso no DB/Frontend
             if total_processed % 5 == 0:
                 conn.commit()
                 log_memory()
@@ -92,12 +95,13 @@ def sync_silver_obras():
     conn.commit()
     cur.close()
     conn.close()
-    print(f"✅ Sync Finished. Total: {total_processed} Geocoded: {geocoded_count}")
+    print(f"✅ Sync Finished. Total: {total_processed}", flush=True)
 
 def sync_silver_despesas():
-    print("📡 Syncing silver_despesas (Placeholder)...")
+    print("📡 Syncing silver_despesas (Placeholder)...", flush=True)
     pass
 
 if __name__ == "__main__":
     sync_silver_obras()
+    sync_silver_despesas()
     aggregate_gold_data()
