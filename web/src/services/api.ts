@@ -22,6 +22,9 @@ export type MapPoint = {
   category: string;
   sector: string;
   contract_value: string;
+  value_total?: string;
+  value_contracted?: string;
+  value_guarantee?: string;
   process_number: string;
   description_detailed: string;
   beneficiary_id: string;

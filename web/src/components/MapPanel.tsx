@@ -224,11 +224,30 @@ export default function MapPanel({ points, loading, selectedSector, focusPoint }
 
                   <div>
                     <div style="background: #161b22; padding: 16px; border-radius: 16px; border: 1px solid ${color}33;">
-                      <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">${isObra ? 'Valor Estimado' : 'Valor Pago'}</div>
-                      <div style="font-size: 24px; font-weight: 900; color: white; letter-spacing: -0.04em;">
-                        ${point.contract_value && Number(point.contract_value) > 0 
-                          ? formatCurrency(point.contract_value) 
-                          : '<span style="color: #64748b; font-size: 14px;">Valor não informado</span>'}
+                      <div style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; margin-bottom: 8px;">Detalhamento Financeiro</div>
+                      
+                      <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div>
+                          <div style="font-size: 8px; font-weight: 800; color: #475569; text-transform: uppercase;">Valor do Contrato</div>
+                          <div style="font-size: 18px; font-weight: 900; color: white;">
+                            ${point.value_contracted && Number(point.value_contracted) > 0 ? formatCurrency(point.value_contracted) : '---'}
+                          </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.05);">
+                          <div>
+                            <div style="font-size: 8px; font-weight: 800; color: #475569; text-transform: uppercase;">Valor Total</div>
+                            <div style="font-size: 11px; font-weight: 700; color: #cbd5e1;">
+                              ${point.value_total && Number(point.value_total) > 0 ? formatCurrency(point.value_total) : '---'}
+                            </div>
+                          </div>
+                          <div>
+                            <div style="font-size: 8px; font-weight: 800; color: #475569; text-transform: uppercase;">Garantia</div>
+                            <div style="font-size: 11px; font-weight: 700; color: #cbd5e1;">
+                              ${point.value_guarantee && Number(point.value_guarantee) > 0 ? formatCurrency(point.value_guarantee) : '---'}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -53,13 +53,24 @@ def sync_silver_obras():
             bairro = normalize_bairro(loc.get('bairro', 'Centro Histórico'))
             rua = smart_clean(loc.get('logradouro', ''))
             cep = str(loc.get('cep', '')).strip().replace('-', '')
-            valor = w.get('valorTotal', w.get('valorContrato', w.get('valorGarantiaObra', 0)))
+            
+            # Extração detalhada de valores
+            v_total = w.get('valorTotal', 0)
+            v_contrato = w.get('valorContrato', 0)
+            v_garantia = w.get('valorGarantiaObra', 0)
+            # Valor principal segue a prioridade: Contrato -> Total -> Garantia
+            valor_principal = v_contrato if v_contrato > 0 else (v_total if v_total > 0 else v_garantia)
             
             # Detalhes (chamadas de API individuais)
             print(f"      📡 Fetching details for work {ext_id}...", end="", flush=True)
             fiscal_nome, fiscal_info = get_responsaveis(ext_id)
             coords = get_coordinates(ext_id)
             print(" Done.", flush=True)
+
+            # Extrair dados da contratada
+            contrato_data = w.get('contrato', {})
+            empresa_nome = smart_clean(contrato_data.get('nomeContratado', 'EMPRESA NÃO INFORMADA'))
+            empresa_cnpj = contrato_data.get('cpfCnpjContratado', 'N/A')
             
             if not coords:
                 # 1ª Tentativa: CEP + Logradouro (Mais preciso)
@@ -104,19 +115,30 @@ def sync_silver_obras():
             cur.execute("""
                 INSERT INTO silver_obras (
                     external_id, nome_obra, descricao, valor_licitado, bairro, logradouro, 
-                    latitude, longitude, situacao, orgao, link_tce, data_inicio
+                    latitude, longitude, situacao, orgao, link_tce, data_inicio,
+                    contratada_cnpj, contratada_nome, fiscal_nome, fiscal_info,
+                    valor_total, valor_contrato, valor_garantia
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (external_id) DO UPDATE SET
                     valor_licitado = EXCLUDED.valor_licitado,
                     nome_obra = EXCLUDED.nome_obra,
                     latitude = COALESCE(EXCLUDED.latitude, silver_obras.latitude),
-                    longitude = COALESCE(EXCLUDED.longitude, silver_obras.longitude)
-            """, (ext_id, nome, nome, valor, bairro, rua, lat, lng, 
+                    longitude = COALESCE(EXCLUDED.longitude, silver_obras.longitude),
+                    contratada_cnpj = EXCLUDED.contratada_cnpj,
+                    contratada_nome = EXCLUDED.contratada_nome,
+                    fiscal_nome = EXCLUDED.fiscal_nome,
+                    fiscal_info = EXCLUDED.fiscal_info,
+                    valor_total = EXCLUDED.valor_total,
+                    valor_contrato = EXCLUDED.valor_contrato,
+                    valor_garantia = EXCLUDED.valor_garantia
+            """, (ext_id, nome, nome, valor_principal, bairro, rua, lat, lng, 
                   w.get('situacaoObra', 'N/A'), 
-                  w.get('contrato', {}).get('nomeOrgao', 'PREFEITURA POA'),
+                  contrato_data.get('nomeOrgao', 'PREFEITURA POA'),
                   f"https://compras.tce.rs.gov.br/publico/obras/{ext_id}",
-                  datetime(year, 1, 1)))
+                  datetime(year, 1, 1),
+                  empresa_cnpj, empresa_nome, fiscal_nome, fiscal_info,
+                  v_total, v_contrato, v_garantia))
 
             total_processed += 1
             # Commit a cada obra para visibilidade imediata no frontend

@@ -41,6 +41,9 @@ export const ExpensesRepository = {
         so.longitude, 
         COALESCE(so.nome_obra, 'OBRA SEM DESCRIÇÃO') as description_detailed,
         COALESCE(MAX(so.valor_licitado), 0) as contract_value,
+        COALESCE(MAX(so.valor_total), 0) as value_total,
+        COALESCE(MAX(so.valor_contrato), 0) as value_contracted,
+        COALESCE(MAX(so.valor_garantia), 0) as value_guarantee,
         'INFRAESTRUTURA' as sector,
         'OBRA' as type,
         COALESCE(
