@@ -21,6 +21,7 @@ export function useDashboardData() {
           ApiService.fetchRankingCompanies(),
           ApiService.fetchRankingAgencies()
         ]);
+        console.log(`[useDashboardData] Dados carregados: ${mapPoints.length} pontos de mapa.`);
         setAllMapPoints(mapPoints);
         setGlobalTopExpenses(expenses);
         setGlobalTopCompanies(companies);

@@ -19,10 +19,7 @@ def search_ckan(query):
     except Exception as e:
         print(f"❌ Erro: {e}")
 
-search_ckan('unidade')
-search_ckan('posto')
-search_ckan('parque')
-search_ckan('praca')
-search_ckan('museu')
-search_ckan('teatro')
-search_ckan('administrativo')
+if __name__ == '__main__':
+    import sys
+    query = sys.argv[1] if len(sys.argv) > 1 else 'unidade'
+    search_ckan(query)

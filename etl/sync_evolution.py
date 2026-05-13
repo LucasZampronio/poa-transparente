@@ -154,9 +154,78 @@ def sync_silver_obras():
     print(f"✅ Sync Finished. Total: {total_processed} Geocoded: {geocoded_count}", flush=True)
 
 def sync_silver_despesas():
-    print("📡 Syncing silver_despesas (Placeholder)...", flush=True)
-    pass
+    print("📡 Syncing silver_despesas from Dados Abertos POA...", flush=True)
+    
+    # URLs dos recursos identificados (2022 e 2023 possuem dados)
+    resources = [
+        {"year": 2022, "url": "https://dadosabertos.poa.br/dataset/b5eac908-416d-42f0-9fb6-432f1b717ff1/resource/b9ec16ee-e3a0-4f65-bf71-fc012320baed/download/despesas_2022.csv"},
+        {"year": 2023, "url": "https://dadosabertos.poa.br/dataset/b5eac908-416d-42f0-9fb6-432f1b717ff1/resource/b4f27d52-b65b-4516-b540-ce6cd6788607/download/despesas_2023.csv"}
+    ]
+    
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
+    
+    total_inserted = 0
+    
+    for res in resources:
+        year = res["year"]
+        url = res["url"]
+        print(f"   📥 Downloading despesas {year}...", flush=True)
+        
+        try:
+            response = requests.get(url, timeout=60)
+            if response.status_code != 200:
+                print(f"   ⚠️ Error downloading {year}: {response.status_code}")
+                continue
+                
+            import io
+            import pandas as pd
+            
+            # Decodifica usando ISO-8859-1 (comum em portais gov BR) e usa separador ';'
+            content = response.content.decode('iso-8859-1')
+            df = pd.read_csv(io.StringIO(content), sep=';')
+            
+            print(f"   📊 Processando {len(df)} registros para {year}...", flush=True)
+            
+            for _, row in df.iterrows():
+                # Mapeamento baseado na inspeção do CSV
+                # Colunas: ['data_extracao', 'orgao', 'nome_orgao', 'exercicio', 'mes', ..., 'vlemp', 'vlliq', 'vlpag']
+                
+                try:
+                    # Criamos um num_empenho sintético ou usamos um existente se houver (o CSV não parece ter o ID do empenho direto, vamos usar o índice/mes)
+                    mes = int(row['mes'])
+                    data_empenho = datetime(year, mes, 1)
+                    
+                    cur.execute("""
+                        INSERT INTO silver_despesas (
+                            num_empenho, data_empenho, valor_empenhado, valor_liquidado, valor_pago,
+                            descricao, nome_fornecedor, orgao
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        f"EMP-{year}-{mes}-{total_inserted}",
+                        data_empenho,
+                        float(str(row['vlemp']).replace(',', '.')),
+                        float(str(row['vlliq']).replace(',', '.')),
+                        float(str(row['vlpag']).replace(',', '.')),
+                        row['desc_elemento'] if 'desc_elemento' in row else 'Despesa Orçamentária',
+                        row['nome_orgao'], # Fallback já que não temos o fornecedor detalhado neste CSV
+                        row['nome_orgao']
+                    ))
+                    total_inserted += 1
+                except Exception as e:
+                    continue # Pula erros de parsing individuais
+            
+            conn.commit()
+            print(f"   ✅ Year {year} synced.", flush=True)
+            
+        except Exception as e:
+            print(f"   ❌ Error processing {year}: {e}")
+            
+    cur.close()
+    conn.close()
+    print(f"✨ Total despesas synced: {total_inserted}")
 
 if __name__ == "__main__":
     sync_silver_obras()
+    sync_silver_despesas()
     aggregate_gold_data()

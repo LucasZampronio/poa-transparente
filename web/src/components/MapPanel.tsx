@@ -110,19 +110,24 @@ export default function MapPanel({ points, loading, selectedSector, focusPoint }
     
     if (currentHash !== lastPointsHash.current) {
       lastPointsHash.current = currentHash;
+      console.log(`[MapPanel] Renderizando ${points.length} pontos. Mapa pronto: ${mapReady}`);
 
       // Limpar marcadores anteriores
       markers.current.forEach(m => m.remove());
       markers.current = [];
       popup.current?.remove();
 
-      if (!hasPoints) return;
+      if (!hasPoints) {
+        console.warn("[MapPanel] Array de pontos está vazio.");
+        return;
+      }
 
       const validPoints = points.filter(p => 
         p && p.latitude != null && p.longitude != null && 
         !isNaN(Number(p.latitude)) && !isNaN(Number(p.longitude))
       );
       
+      console.log(`[MapPanel] ${validPoints.length} pontos válidos com coordenadas.`);
       validPoints.forEach((point) => {
         const baseLat = Number(point.latitude);
         const baseLng = Number(point.longitude);

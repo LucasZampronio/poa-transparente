@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 import expenseRoutes from './routes/expenses-routes.js';
