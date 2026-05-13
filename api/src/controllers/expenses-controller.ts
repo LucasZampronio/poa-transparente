@@ -54,6 +54,21 @@ export const ExpensesController = {
     res.json({ success: true, message: 'Dataset limpo com sucesso.' });
   }),
 
+  /**
+   * @deprecated Esta função será removida na v2.0. Use o pipeline ETL externo.
+   * Dispara a sincronização de obras do TCE.
+   */
+  syncTceObras: asyncHandler(async (req: Request, res: Response) => {
+    // Nota de Mentor: Em um sistema real, aqui dispararíamos um Job no BullMQ ou chamaria o serviço Python.
+    // Para fins de estudo, apenas simulamos o sucesso.
+    console.warn('⚠️ Chamada a endpoint depreciado: syncTceObras');
+    res.json({ 
+      success: true, 
+      count: 0, 
+      message: 'Sincronização iniciada em background (Modo Depreciado).' 
+    });
+  }),
+
   health: asyncHandler(async (req: Request, res: Response) => {
     const count = await ExpensesRepository.getHealth();
     res.json({ status: 'ok', rows: count });

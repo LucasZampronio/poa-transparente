@@ -16,5 +16,6 @@ router.get('/timeseries', ExpensesController.getTimeSeries);
 
 // Sync Actions
 router.post('/sync/cleanup', requireAuth, ExpensesController.cleanup);
+router.post('/sync/tce', requireAuth, ExpensesController.syncTceObras);
 
 export default router;

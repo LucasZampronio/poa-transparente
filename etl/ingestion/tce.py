@@ -1,12 +1,17 @@
 import time
 import requests
+import logging
 from etl.silver.cleaners import smart_clean
+
+# Configuração básica de log para aprendizado do estagiário
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("ingestion.tce")
 
 CNPJ_POA = "92963560000160"
 MUNICIPIO_CODE = "88301"
 
 def get_works(year):
-    print(f"🔍 Fetching works for year {year}...")
+    logger.info(f"🔍 Fetching works for year {year}...")
     all_content = []
     page = 0
     size = 100
@@ -14,27 +19,29 @@ def get_works(year):
         url = f"https://portal.tce.rs.gov.br/api/obras/v1/orgaos/{CNPJ_POA}/obras?municipio={MUNICIPIO_CODE}&exercicio={year}&page={page}&size={size}"
         try:
             response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
-            if response.status_code == 200:
-                data = response.json()
-                content = data.get('content', [])
-                if not content: 
-                    break
-                
-                all_content.extend(content)
-                print(f"   - Page {page}: Found {len(content)} works. Total so far: {len(all_content)}")
-                
-                # Check if it's the last page
-                if data.get('last') is True or len(content) < size:
-                    break
-                    
-                page += 1
-                time.sleep(0.5) # Avoid rate limiting
-            else:
-                print(f"   ⚠️ Error {response.status_code} on page {page}")
+            response.raise_for_status() # Lança erro para status 4xx ou 5xx
+            
+            data = response.json()
+            content = data.get('content', [])
+            if not content: 
                 break
+            
+            all_content.extend(content)
+            logger.info(f"   - Page {page}: Found {len(content)} works. Total so far: {len(all_content)}")
+            
+            # Check if it's the last page
+            if data.get('last') is True or len(content) < size:
+                break
+                
+            page += 1
+            time.sleep(0.5) # Avoid rate limiting
+        except requests.exceptions.RequestException as e:
+            logger.error(f"   ❌ Network error on page {page}: {e}")
+            raise # Re-raise to let the orchestrator know it failed
         except Exception as e:
-            print(f"   ❌ Exception: {e}")
-            break
+            logger.error(f"   ❌ Unexpected error on page {page}: {e}")
+            raise
+            
     return all_content
 
 def get_coordinates(id_obra):
@@ -46,7 +53,7 @@ def get_coordinates(id_obra):
             if isinstance(coords, list) and len(coords) > 0:
                 return float(coords[0].get('latitude')), float(coords[0].get('longitude'))
     except Exception as e:
-        print(f"   ⚠️ Exception on get_coordinates({id_obra}): {e}")
+        logger.warning(f"   ⚠️ Exception on get_coordinates({id_obra}): {e}")
     return None
 
 def get_responsaveis(id_obra):
@@ -64,5 +71,5 @@ def get_responsaveis(id_obra):
                     vinculo = r.get('vinculo', 'N/A')
                     return nome, f"Setor: {setor} | Vinculo: {vinculo}"
     except Exception as e:
-        print(f"   ⚠️ Exception on get_responsaveis({id_obra}): {e}")
+        logger.warning(f"   ⚠️ Exception on get_responsaveis({id_obra}): {e}")
     return None, None

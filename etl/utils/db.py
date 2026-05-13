@@ -29,12 +29,33 @@ def load_company_cache():
     try:
         with get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT beneficiary_id, company_name FROM public_expenses WHERE company_name IS NOT NULL")
+                # Corrigido para usar a tabela dedicada de cache
+                cur.execute("SELECT cnpj, name FROM company_cache")
                 for row in cur.fetchall():
                     cache[row[0]] = row[1]
     except Exception as e:
-        print(f"Warning: Could not load company cache: {e}")
+        print(f"Warning: Could not load company cache from table: {e}")
+        # Fallback para tentar ler da tabela legada se a nova falhar (migração suave)
+        try:
+            with get_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT beneficiary_id, company_name FROM public_expenses WHERE company_name IS NOT NULL")
+                    for row in cur.fetchall():
+                        cache[row[0]] = row[1]
+        except: pass
     return cache
+
+def save_company_to_cache(cnpj, name):
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO company_cache (cnpj, name) VALUES (%s, %s) ON CONFLICT (cnpj) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()",
+                    (cnpj, name)
+                )
+            conn.commit()
+    except Exception as e:
+        print(f"Warning: Could not save company to cache: {e}")
 
 def load_geo_cache():
     cache = {}

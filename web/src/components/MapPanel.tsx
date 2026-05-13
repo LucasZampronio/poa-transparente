@@ -129,6 +129,16 @@ export default function MapPanel({ points, loading, selectedSector, focusPoint }
       
       console.log(`[MapPanel] ${validPoints.length} pontos válidos com coordenadas.`);
       validPoints.forEach((point) => {
+        // Log de depuração para integridade dos dados por ponto
+        if (!point.company_name || point.company_name === 'EMPRESA NAO INFORMADA' || !point.value_contracted || Number(point.value_contracted) === 0) {
+          console.warn(`[MapPanel] Dados incompletos no ponto ${point.process_number}:`, {
+            empresa: point.company_name,
+            cnpj: point.beneficiary_id,
+            v_contrato: point.value_contracted,
+            v_total: point.value_total
+          });
+        }
+
         const baseLat = Number(point.latitude);
         const baseLng = Number(point.longitude);
         

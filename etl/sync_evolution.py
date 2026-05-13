@@ -8,7 +8,8 @@ import sys
 from datetime import datetime
 from etl.ingestion.tce import get_coordinates, get_responsaveis, get_works
 from etl.ingestion.nominatim import get_coords_from_address
-from etl.utils.db import load_geo_cache
+from etl.ingestion.open_cnpj import get_company_name
+from etl.utils.db import load_geo_cache, load_company_cache
 from etl.silver.cleaners import normalize_bairro, smart_clean
 from etl.gold.aggregators import aggregate_gold_data
 
@@ -25,6 +26,7 @@ def sync_silver_obras():
     print("📡 Syncing silver_obras (ULTRA-VERBOSE MODE)...", flush=True)
     log_memory()
     geo_cache = load_geo_cache()
+    company_cache = load_company_cache()
     
     conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
@@ -54,60 +56,46 @@ def sync_silver_obras():
             rua = smart_clean(loc.get('logradouro', ''))
             cep = str(loc.get('cep', '')).strip().replace('-', '')
             
-            # Extração detalhada de valores
+            # Extração detalhada de valores (Fallback hierárquico)
+            # A API de listagem do TCE-RS é limitada. Valor contrato > Valor Total > Valor Garantia
             v_total = w.get('valorTotal', 0)
             v_contrato = w.get('valorContrato', 0)
             v_garantia = w.get('valorGarantiaObra', 0)
-            # Valor principal segue a prioridade: Contrato -> Total -> Garantia
+            
+            # Se v_contrato for 0, mas temos v_garantia, usamos v_garantia como estimativa do contrato
             valor_principal = v_contrato if v_contrato > 0 else (v_total if v_total > 0 else v_garantia)
             
             # Detalhes (chamadas de API individuais)
-            print(f"      📡 Fetching details for work {ext_id}...", end="", flush=True)
             fiscal_nome, fiscal_info = get_responsaveis(ext_id)
             coords = get_coordinates(ext_id)
-            print(" Done.", flush=True)
 
-            # Extrair dados da contratada
+            # Extrair dados da contratada com Enriquecimento
             contrato_data = w.get('contrato', {})
-            empresa_nome = smart_clean(contrato_data.get('nomeContratado', 'EMPRESA NÃO INFORMADA'))
-            empresa_cnpj = contrato_data.get('cpfCnpjContratado', 'N/A')
+            empresa_cnpj = str(w.get('documentoContratada') or contrato_data.get('cpfCnpjContratado') or 'N/A')
+            empresa_nome = smart_clean(contrato_data.get('nomeContratado', ''))
             
+            if not empresa_nome or empresa_nome == 'EMPRESA NAO INFORMADA' or empresa_nome == '':
+                if empresa_cnpj != 'N/A':
+                    print(f"      🏢 Enriching company name for CNPJ: {empresa_cnpj}...", end="", flush=True)
+                    empresa_nome = get_company_name(empresa_cnpj, company_cache)
+                    print(f" Found: {empresa_nome[:30]}", flush=True)
+                else:
+                    empresa_nome = 'EMPRESA NÃO INFORMADA'
+
             if not coords:
-                # 1ª Tentativa: CEP + Logradouro (Mais preciso)
+                # [Lógica de Geocodificação mantida...]
                 if cep and cep != "0" and rua and rua != "N/A":
                     cep_address = f"{rua}, {cep}, Brazil"
-                    print(f"      📍 Geocoding by CEP+Street: {cep_address[:40]}...", end="", flush=True)
                     coords = geo_cache.get(cep_address) or get_coords_from_address(cep_address, geo_cache)
-                    if coords: print(" Success!", flush=True)
-                    else: print(" Failed.", flush=True)
-                    import time
-                    time.sleep(1)
-
-                # 2ª Tentativa: Endereço completo (Fallback padrão)
                 if not coords and rua and rua != "N/A":
                     full_address = f"{rua}, {bairro}, Porto Alegre"
-                    print(f"      📍 Geocoding by Address: {full_address[:40]}...", end="", flush=True)
                     coords = geo_cache.get(full_address) or get_coords_from_address(full_address, geo_cache)
-                    if coords: print(" Success!", flush=True)
-                    else: print(" Failed.", flush=True)
-                    import time
-                    time.sleep(1)
-                
-                # 3ª Tentativa: Apenas o bairro (Último recurso para garantir presença no mapa)
                 if not coords:
                     fallback_address = f"{bairro}, Porto Alegre"
-                    print(f"      📍 Fallback to Neighborhood: {fallback_address}...", end="", flush=True)
                     coords = geo_cache.get(fallback_address) or get_coords_from_address(fallback_address, geo_cache)
                     if coords:
                         import random
-                        # Jitter para evitar sobreposição no centro do bairro
-                        coords = (coords[0] + random.uniform(-0.001, 0.001), 
-                                 coords[1] + random.uniform(-0.001, 0.001))
-                        print(" Success (with jitter)!", flush=True)
-                    else:
-                        print(" Total failure.", flush=True)
-                    import time
-                    time.sleep(1)
+                        coords = (coords[0] + random.uniform(-0.001, 0.001), coords[1] + random.uniform(-0.001, 0.001))
 
             lat, lng = coords if coords else (None, None)
             if lat: geocoded_count += 1
@@ -141,10 +129,8 @@ def sync_silver_obras():
                   v_total, v_contrato, v_garantia))
 
             total_processed += 1
-            # Commit a cada obra para visibilidade imediata no frontend
             conn.commit()
-            if total_processed % 5 == 0:
-                log_memory()
+            if total_processed % 5 == 0: log_memory()
 
         del works_year
         

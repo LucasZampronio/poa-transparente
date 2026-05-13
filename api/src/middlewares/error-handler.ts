@@ -1,15 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
+import pino from 'pino';
+
+const logger = pino({
+  transport: {
+    target: 'pino-pretty',
+    options: {
+      colorize: true
+    }
+  }
+});
 
 export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
-  // Logging estruturado simples
-  console.error(JSON.stringify({
-    level: 'error',
-    message: err.message,
+  logger.error({
+    msg: err.message,
     stack: err.stack,
     path: req.path,
     method: req.method,
-    timestamp: new Date().toISOString()
-  }));
+  }, 'Unhandled exception');
 
   const statusCode = res.statusCode !== 200 ? res.statusCode : 500;
   
