@@ -36,6 +36,7 @@ Thumbs.db
 
 # Project Specific
 tmp/
+coverage/
 *.json
 *.csv
 *.pdf
