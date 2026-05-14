@@ -37,6 +37,7 @@ Thumbs.db
 # Project Specific
 tmp/
 coverage/
+infra/openbao/data/
 *.json
 *.csv
 *.pdf
