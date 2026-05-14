@@ -1,15 +1,15 @@
 import request from 'supertest';
-import { app } from './index.js';
+import { app } from '../../api/src/index.js';
 import { jest } from '@jest/globals';
-import { ExpensesRepository } from './repositories/expenses-repository.js';
+import { ExpensesRepository } from '../../api/src/repositories/expenses-repository.js';
 
-describe('API Endpoints', () => {
+describe('API Integration Tests', () => {
   describe('GET /health', () => {
     it('should return 200 and status ok', async () => {
       jest.spyOn(ExpensesRepository, 'getHealth').mockResolvedValue(100);
 
       const res = await request(app).get('/health');
-
+      
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ status: 'ok', rows: 100 });
     });
@@ -34,4 +34,3 @@ describe('API Endpoints', () => {
     });
   });
 });
-
