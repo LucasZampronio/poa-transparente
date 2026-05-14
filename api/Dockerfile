@@ -18,13 +18,20 @@ COPY package*.json ./
 # Instala apenas dependências de produção
 RUN npm install --omit=dev
 
+# Instala curl para buscar segredos do OpenBao
+RUN apk add --no-cache curl
+
 # Copia os arquivos compilados do estágio de build
 COPY --from=builder /app/dist ./dist
 
+# Copia o script de entrypoint
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # A API não deve depender de um arquivo .env físico em produção.
-# As variáveis devem ser injetadas pelo Docker Compose ou pela plataforma de Cloud (OCI/AWS).
 ENV NODE_ENV=production
 ENV PORT=4000
 
 EXPOSE 4000
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["node", "dist/index.js"]
