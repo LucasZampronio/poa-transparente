@@ -20,6 +20,7 @@ app.use('/api', expenseRoutes);
 // Global Error Handler
 app.use(errorHandler);
 
+/* istanbul ignore next */
 if (process.env.NODE_ENV !== 'test') {
   app.listen(port, () => {
     console.log(`🚀 API POA Transparente executando na porta ${port}`);

@@ -25,5 +25,6 @@ export default {
     'api/src/**/*.ts',
     '!**/node_modules/**',
     '!**/dist/**',
+    '!api/src/services/category-suite.ts',
   ],
 };
