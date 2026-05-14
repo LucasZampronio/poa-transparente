@@ -42,6 +42,17 @@ describe('API Services (Unit)', () => {
       expect(result).toEqual({ data: 'ok' });
     });
 
+    it('portalGet should throw error if response is not ok', async () => {
+      const mockResponse = { 
+        ok: false, 
+        status: 403, 
+        text: () => Promise.resolve('Forbidden') 
+      };
+      jest.spyOn(global, 'fetch').mockResolvedValue(mockResponse as any);
+
+      await expect(portalGet('/test', {})).rejects.toThrow('Portal Transparencia HTTP 403: Forbidden');
+    });
+
     it('fetchConvenios should call portalGet with convenio params', async () => {
       jest.spyOn(global, 'fetch').mockResolvedValue({ 
         ok: true, 
@@ -67,6 +78,49 @@ describe('API Services (Unit)', () => {
       expect(result).toEqual(mockRows);
     });
 
+    it('syncBolsaFamilia should succeed with valid data', async () => {
+      const mockClient = {
+        query: jest.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('INSERT INTO portal_transparencia_sync_runs')) {
+            return { rows: [{ id: 'run-123' }] };
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      jest.spyOn(pool, 'connect').mockResolvedValue(mockClient as any);
+      
+      const mockBFData = [{
+        id: 1,
+        dataReferencia: '2024-01-01',
+        municipio: { codigoIBGE: '4314902', nomeIBGE: 'POA', uf: { sigla: 'RS' } },
+        tipo: { id: 1, descricao: 'BF', descricaoDetalhada: 'BF' },
+        valor: 100,
+        quantidadeBeneficiados: 10
+      }];
+      
+      jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockBFData)
+      } as any);
+
+      const result = await syncBolsaFamilia('202401', '4314902');
+
+      expect(result.syncedRecords).toBe(1);
+      expect(mockClient.query).toHaveBeenCalledWith(expect.stringContaining("status = 'SUCCESS'"), expect.any(Array));
+    });
+
+    it('syncBolsaFamilia should handle DB errors during initialization', async () => {
+      const mockClient = {
+        query: jest.fn().mockRejectedValue(new Error('DB Down')),
+        release: jest.fn(),
+      };
+      jest.spyOn(pool, 'connect').mockResolvedValue(mockClient as any);
+
+      await expect(syncBolsaFamilia('202401', '4314902')).rejects.toThrow('DB Down');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+    });
+
     it('syncBolsaFamilia should handle API errors and update status to FAILED', async () => {
       const mockClient = {
         query: jest.fn().mockImplementation(async (sql: string) => {
@@ -86,6 +140,30 @@ describe('API Services (Unit)', () => {
         expect.stringContaining("UPDATE portal_transparencia_sync_runs SET status = 'FAILED'"),
         expect.any(Array)
       );
+    });
+
+    it('syncBolsaFamilia should handle errors during data insertion', async () => {
+      const mockClient = {
+        query: jest.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('INSERT INTO portal_transparencia_sync_runs')) {
+            return { rows: [{ id: 'run-123' }] };
+          }
+          if (sql.includes('INSERT INTO portal_transparencia_raw_records')) {
+            throw new Error('Insert Error');
+          }
+          return { rows: [] };
+        }),
+        release: jest.fn(),
+      };
+      jest.spyOn(pool, 'connect').mockResolvedValue(mockClient as any);
+      jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([{ id: 1, dataReferencia: '2024-01-01', municipio: { codigoIBGE: '1', nomeIBGE: 'a', uf: { sigla: 'b' } }, tipo: { id: 1, descricao: 'c', descricaoDetalhada: 'd' }, valor: 1, quantidadeBeneficiados: 1 }])
+      } as any);
+
+      await expect(syncBolsaFamilia('202401', '4314902')).rejects.toThrow('Insert Error');
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClient.query).toHaveBeenCalledWith(expect.stringContaining("status = 'FAILED'"), expect.any(Array));
     });
   });
 
@@ -110,6 +188,17 @@ describe('API Services (Unit)', () => {
         })
       );
       expect(result).toEqual({ success: true });
+    });
+
+    it('openDataGet should throw error if response is not ok', async () => {
+      const mockResponse = { 
+        ok: false, 
+        status: 500, 
+        text: () => Promise.resolve('Server Error') 
+      };
+      jest.spyOn(global, 'fetch').mockResolvedValue(mockResponse as any);
+
+      await expect(openDataGet('/test')).rejects.toThrow('Dados Abertos HTTP 500: Server Error');
     });
 
     it('searchPoaDatasets should call openDataGet with default poa query', async () => {

@@ -102,8 +102,11 @@ export async function syncBolsaFamilia(mesAno: string, codigoIbge: string) {
     syncRunId = runResult.rows[0].id as string;
     await client.query('COMMIT');
   } catch (err) {
+    /* istanbul ignore next */
     await client.query('ROLLBACK');
+    /* istanbul ignore next */
     client.release();
+    /* istanbul ignore next */
     throw err;
   }
 

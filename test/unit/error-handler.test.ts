@@ -39,4 +39,18 @@ describe('Error Handler Middleware (Unit)', () => {
 
     expect(mockResponse.status).toHaveBeenCalledWith(404);
   });
+
+  it('should include stack trace in development mode', () => {
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    const error = new Error('Dev Error');
+    errorHandler(error, mockRequest as Request, mockResponse as Response, nextFunction);
+
+    expect(mockResponse.json).toHaveBeenCalledWith(expect.objectContaining({
+      error: expect.objectContaining({
+        stack: expect.any(String)
+      })
+    }));
+    process.env.NODE_ENV = originalEnv;
+  });
 });

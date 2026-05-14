@@ -89,6 +89,12 @@ describe('ExpensesRepository (Unit)', () => {
     expect(result).toEqual(mockRows);
   });
 
+  it('cleanup should execute truncate query', async () => {
+    jest.spyOn(pool, 'query').mockResolvedValue({} as any);
+    await ExpensesRepository.cleanup();
+    expect(pool.query).toHaveBeenCalledWith(expect.stringContaining('TRUNCATE'));
+  });
+
   it('getHealth should return row count as number', async () => {
     jest.spyOn(pool, 'query').mockResolvedValue({ rows: [{ total: '42' }] } as any);
 
