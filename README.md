@@ -1,5 +1,7 @@
 # POA Transparente
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=LucasZampronio_poa-transparente&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=LucasZampronio_poa-transparente)
+
 Plataforma de estudo para coletar, processar e visualizar dados de transparência pública com foco em clareza, análise geográfica e observabilidade com Grafana.
 
 ## Objetivo
