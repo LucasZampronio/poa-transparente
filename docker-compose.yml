@@ -53,7 +53,20 @@ services:
     depends_on:
       - api
 
-
+  openbao:
+    image: ghcr.io/openbao/openbao:latest
+    container_name: poa-openbao
+    ports:
+      - "8200:8200"
+    environment:
+      BAO_UI: "true"
+    volumes:
+      - ./infra/openbao/data:/bao/data
+      - ./infra/openbao/config/bao.hcl:/bao/config/bao.hcl
+    command: ["bao", "server", "-config=/bao/config/bao.hcl"]
+    cap_add:
+      - IPC_LOCK
+    restart: always
 
   prometheus:
     image: prom/prometheus:v2.54.1

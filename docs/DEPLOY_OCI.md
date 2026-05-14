@@ -12,6 +12,7 @@ Utilizamos a **Oracle Cloud Infrastructure (OCI)** para hospedar nossa stack, ap
 
 ### Documentação Detalhada:
 👉 **[Guia Passo-a-Passo de Deploy na OCI](deployment/OCI.md)**
+👉 **[Gestão de Secrets com OpenBao](deployment/SECRETS.md)**
 
 ---
 
