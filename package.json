@@ -3,19 +3,24 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Plataforma de transparÃªncia pÃºblica para Porto Alegre com orquestraÃ§Ã£o de agentes de IA.",
+  "description": "Plataforma de transparência pública para Porto Alegre com orquestração de agentes de IA.",
   "scripts": {
     "team": "cd orchestrator && pnpm run dev --project ..",
     "team:install": "cd orchestrator && pnpm install",
     "api:dev": "cd api && npm run dev",
     "web:dev": "cd web && npm run dev",
     "dev": "concurrently \"npm run api:dev\" \"npm run web:dev\" \"npm run team\"",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.js --verbose"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config jest.config.js --verbose",
+    "lint": "eslint .",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.29.5",
     "@babel/preset-react": "^7.28.5",
     "@babel/preset-typescript": "^7.28.5",
+    "@commitlint/cli": "^21.0.1",
+    "@commitlint/config-conventional": "^21.0.1",
+    "@eslint/js": "^10.0.1",
     "@jest/globals": "^30.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -26,12 +31,18 @@
     "@types/node": "^25.7.0",
     "@types/pg": "^8.20.0",
     "@types/supertest": "^7.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.3",
+    "@typescript-eslint/parser": "^8.59.3",
     "babel-jest": "^30.4.1",
     "concurrently": "^8.2.2",
     "cors": "^2.8.6",
     "cross-env": "^10.1.0",
     "dotenv": "^17.4.2",
+    "eslint": "^9.39.4",
+    "eslint-plugin-import": "^2.32.0",
     "express": "^5.2.1",
+    "globals": "^17.6.0",
+    "husky": "^9.1.7",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.4.2",
     "jest-environment-jsdom": "^30.4.1",
@@ -41,6 +52,7 @@
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.9",
     "ts-node": "^10.9.2",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.3"
   }
 }

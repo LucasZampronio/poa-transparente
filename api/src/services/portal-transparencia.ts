@@ -90,7 +90,7 @@ export async function syncBolsaFamilia(mesAno: string, codigoIbge: string) {
   
   // 1. Cria a run de sync no BD
   const client = await pool.connect();
-  let syncRunId: string | null = null;
+  let syncRunId: string;
   
   try {
     await client.query('BEGIN');
@@ -111,7 +111,7 @@ export async function syncBolsaFamilia(mesAno: string, codigoIbge: string) {
   }
 
   // 2. Busca na API
-  let data: BolsaFamiliaResponse[] = [];
+  let data: BolsaFamiliaResponse[];
   try {
     // A API do Portal usa paginação. Assumindo página 1 para começar.
     data = await portalGet<BolsaFamiliaResponse[]>('/novo-bolsa-familia-por-municipio', {
