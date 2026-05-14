@@ -5,6 +5,7 @@ export default {
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^@api/(.*)$': '<rootDir>/api/src/$1',
   },
   transform: {
     '^.+\\.tsx?$': [
@@ -16,5 +17,13 @@ export default {
   },
   testMatch: [
     '<rootDir>/test/**/*.test.ts'
+  ],
+  collectCoverage: true,
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov'],
+  collectCoverageFrom: [
+    'api/src/**/*.ts',
+    '!**/node_modules/**',
+    '!**/dist/**',
   ],
 };
