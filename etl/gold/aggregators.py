@@ -55,10 +55,9 @@ def aggregate_gold_data():
                     # 3. Top Empresas
                     cur.execute("""
                         INSERT INTO gold_top_empresas (cnpj, empresa, total_recebido, quantidade_contratos)
-                        SELECT sd.cnpj_fornecedor, sd.nome_fornecedor, SUM(sd.valor_pago), COUNT(DISTINCT sd.id)
+                        SELECT COALESCE(sd.cnpj_fornecedor, 'N/A'), sd.nome_fornecedor, SUM(sd.valor_pago), COUNT(DISTINCT sd.id)
                         FROM silver_despesas sd
-                        WHERE sd.cnpj_fornecedor IS NOT NULL
-                        GROUP BY sd.cnpj_fornecedor, sd.nome_fornecedor
+                        GROUP BY COALESCE(sd.cnpj_fornecedor, 'N/A'), sd.nome_fornecedor
                         ON CONFLICT (cnpj) DO UPDATE SET
                             total_recebido = EXCLUDED.total_recebido,
                             quantidade_contratos = EXCLUDED.quantidade_contratos

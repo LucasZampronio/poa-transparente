@@ -10,16 +10,25 @@ from etl.gold.aggregators import aggregate_gold_data
 def sync_pipeline():
     print("--- 🚀 INICIANDO PIPELINE ETL MEDALLION ---")
     
-    # 1. Sincroniza Obras do TCE (Silver)
-    sync_silver_obras()
-    
-    # 2. Sincroniza Despesas (Silver)
-    sync_silver_despesas()
-    
-    # 3. Agrega Camada Gold
-    aggregate_gold_data()
-    
-    print("--- ✨ PIPELINE FINALIZADO COM SUCESSO! ---")
+    try:
+        # 1. Sincroniza Obras do TCE (Silver)
+        print("\n[STEP 1/3] Sincronizando Obras (TCE-RS)...")
+        sync_silver_obras()
+        
+        # 2. Sincroniza Despesas (Silver)
+        print("\n[STEP 2/3] Sincronizando Despesas (Dados Abertos POA)...")
+        sync_silver_despesas()
+        
+        # 3. Agrega Camada Gold
+        print("\n[STEP 3/3] Agregando Camada Gold...")
+        aggregate_gold_data()
+        
+        print("\n--- ✨ PIPELINE FINALIZADO COM SUCESSO! ---")
+    except Exception as e:
+        print(f"\n❌ CRITICAL ERROR no Pipeline ETL: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 if __name__ == "__main__":
     sync_pipeline()

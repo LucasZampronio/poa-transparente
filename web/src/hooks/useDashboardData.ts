@@ -6,6 +6,7 @@ export function useDashboardData() {
   const [globalTopExpenses, setGlobalTopExpenses] = useState<any[]>([]);
   const [globalTopCompanies, setGlobalTopCompanies] = useState<any[]>([]);
   const [globalTopAgencies, setGlobalTopAgencies] = useState<any[]>([]);
+  const [globalSummary, setGlobalSummary] = useState<any>(null);
   const [selectedYear, setSelectedYear] = useState<string>('ALL');
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   
@@ -15,17 +16,19 @@ export function useDashboardData() {
   useEffect(() => {
     async function initData() {
       try {
-        const [mapPoints, expenses, companies, agencies] = await Promise.all([
+        const [mapPoints, expenses, companies, agencies, summary] = await Promise.all([
           ApiService.fetchMapPoints(),
           ApiService.fetchRankingExpenses(),
           ApiService.fetchRankingCompanies(),
-          ApiService.fetchRankingAgencies()
+          ApiService.fetchRankingAgencies(),
+          ApiService.fetchSummary()
         ]);
         console.log(`[useDashboardData] Dados carregados: ${mapPoints.length} pontos de mapa.`);
         setAllMapPoints(mapPoints);
         setGlobalTopExpenses(expenses);
         setGlobalTopCompanies(companies);
         setGlobalTopAgencies(agencies);
+        setGlobalSummary(summary);
       } catch (e) {
         setError((e as Error).message);
       } finally {
@@ -47,8 +50,6 @@ export function useDashboardData() {
       points = points.filter(p => {
         if (!p) return false;
         const dateStr = String(p.reference_date || '');
-        // Se for ISO string (2026-01-01...), pega os 4 primeiros
-        // Se for string de data formatada ou objeto Date convertido, procura o ano
         return dateStr.includes(selectedYear);
       });
     }
@@ -57,11 +58,16 @@ export function useDashboardData() {
       points = points.filter(p => p && p.sector === selectedSector);
     }
     
-    // Calcula Resumo (KPIs)
-    const totalSpent = points.reduce((acc, p) => acc + Number(p?.contract_value || 0), 0);
-    const uniqueCompanies = new Set(points.map(p => p?.company_name).filter(Boolean)).size;
-    const uniqueAgencies = new Set(points.map(p => p?.agency).filter(Boolean)).size;
-
+    // Se não houver filtro, usa o resumo global da API. Caso contrário, calcula o proporcional.
+    const isFiltered = selectedYear !== 'ALL' || selectedSector !== null;
+    
+    const summary = !isFiltered && globalSummary ? globalSummary : {
+      total_spent: String(points.reduce((acc, p) => acc + Number(p?.contract_value || 0), 0)),
+      contracts_count: String(points.length),
+      companies_count: String(new Set(points.map(p => p?.company_name).filter(Boolean)).size),
+      agencies_count: String(new Set(points.map(p => p?.agency).filter(Boolean)).size)
+    };
+    
     // Maiores Despesas Individuais (Empenhos Reais) - Segura contra nulos
     const topExpensesList = safeTopExpenses
       .filter(e => e && e.description)
@@ -96,12 +102,7 @@ export function useDashboardData() {
 
     return {
       points,
-      summary: {
-        total_spent: String(totalSpent),
-        contracts_count: String(points.length),
-        companies_count: String(uniqueCompanies),
-        agencies_count: String(uniqueAgencies)
-      },
+      summary,
       topCompanies: safeTopCompanies,
       topAgencies: safeTopAgencies,
       topExpenses: topExpensesList,

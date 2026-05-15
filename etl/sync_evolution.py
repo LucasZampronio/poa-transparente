@@ -185,8 +185,8 @@ def sync_silver_despesas():
                     cur.execute("""
                         INSERT INTO silver_despesas (
                             num_empenho, data_empenho, valor_empenhado, valor_liquidado, valor_pago,
-                            descricao, nome_fornecedor, orgao
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            descricao, cnpj_fornecedor, nome_fornecedor, orgao
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         f"EMP-{year}-{mes}-{total_inserted}",
                         data_empenho,
@@ -194,6 +194,7 @@ def sync_silver_despesas():
                         float(str(row['vlliq']).replace(',', '.')),
                         float(str(row['vlpag']).replace(',', '.')),
                         row['desc_elemento'] if 'desc_elemento' in row else 'Despesa Orçamentária',
+                        'N/A', # CNPJ não disponível neste dataset simplificado
                         row['nome_orgao'], # Fallback já que não temos o fornecedor detalhado neste CSV
                         row['nome_orgao']
                     ))
