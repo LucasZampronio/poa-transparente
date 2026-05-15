@@ -1,18 +1,16 @@
 import pg from 'pg';
 
+// Em ambientes NodeNext/ESM, o import do pg deve ser tratado com cuidado para manter os tipos.
 const { Pool } = pg;
 
-// Configuração otimizada para ambiente Always Free da OCI (Ampere/ARM)
-// Evita que conexões fiquem presas e consumam toda a RAM da instância.
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 20,              // Máximo de conexões simultâneas
-  idleTimeoutMillis: 30000, // Fecha conexões ociosas após 30s
-  connectionTimeoutMillis: 2000, // Timeout para novas conexões (2s)
-  maxUses: 7500,        // Rotaciona a conexão após X usos para evitar vazamentos pequenos
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+  maxUses: 7500,
 });
 
-// Listener para erros inesperados em conexões ociosas
-pool.on('error', (err) => {
+pool.on('error', (err: Error) => {
   console.error('❌ Erro inesperado no pool de conexões:', err);
 });
