@@ -2,8 +2,13 @@ import request from 'supertest';
 import { app } from '../../api/src/index.js';
 import { jest } from '@jest/globals';
 import { ExpensesRepository } from '../../api/src/repositories/expenses-repository.js';
+import { pool } from '../../api/src/db.js';
 
 describe('API Integration Tests', () => {
+  afterAll(async () => {
+    await pool.end();
+  });
+
   describe('GET /health', () => {
     it('should return 200 and status ok', async () => {
       jest.spyOn(ExpensesRepository, 'getHealth').mockResolvedValue(100);
