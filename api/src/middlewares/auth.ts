@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
@@ -8,13 +9,18 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 
   const token = authHeader.split(' ')[1];
-  
-  /* istanbul ignore next */
-  const tokenToCompare = process.env.CONECTA_GOV_TOKEN || '';
+  const secret = process.env.JWT_SECRET;
 
-  if (token !== tokenToCompare) {
-    return res.status(403).json({ error: 'Token inválido ou expirado' });
+  if (!secret) {
+    console.error('CRITICAL: JWT_SECRET not configured');
+    return res.status(500).json({ error: 'Erro interno de configuração de segurança' });
   }
 
-  next();
+  try {
+    const decoded = jwt.verify(token, secret);
+    (req as any).user = decoded;
+    next();
+  } catch (err) {
+    return res.status(403).json({ error: 'Token inválido ou expirado' });
+  }
 }

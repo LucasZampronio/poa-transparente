@@ -3,15 +3,17 @@ services:
     image: postgres:16
     container_name: poa-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-poa_transparente}
-      POSTGRES_USER: ${POSTGRES_USER:-poa}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-poa}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - ./data/db/init:/docker-entrypoint-initdb.d
+    networks:
+      - poa-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-poa} -d ${POSTGRES_DB:-poa_transparente}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,12 +24,12 @@ services:
     container_name: poa-etl
     env_file: .env
     environment:
-      BAO_ADDR: ${BAO_ADDR:-http://openbao:8200}
-      BAO_TOKEN: ${BAO_TOKEN}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-poa}:${POSTGRES_PASSWORD:-poa}@postgres:5432/${POSTGRES_DB:-poa_transparente}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - poa-network
 
   api:
     build:
@@ -35,27 +37,27 @@ services:
     container_name: poa-api
     env_file: .env
     environment:
-      BAO_ADDR: ${BAO_ADDR:-http://openbao:8200}
-      BAO_TOKEN: ${BAO_TOKEN}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-poa}:${POSTGRES_PASSWORD:-poa}@postgres:5432/${POSTGRES_DB:-poa_transparente}
-      PORTAL_TRANSPARENCIA_API_KEY: ${PORTAL_TRANSPARENCIA_API_KEY}
-      CONECTA_GOV_TOKEN: ${CONECTA_GOV_TOKEN}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     ports:
       - "4000:4000"
     depends_on:
-      - postgres
-      - etl
+      postgres:
+        condition: service_healthy
+    networks:
+      - poa-network
 
   web:
     build:
       context: ./web
       args:
-        - VITE_API_URL=${VITE_API_URL:-http://localhost}
+        - VITE_API_URL=${VITE_API_URL}
     container_name: poa-web
     ports:
       - "${WEB_PORT:-80}:80"
     depends_on:
       - api
+    networks:
+      - poa-network
 
   openbao:
     image: ghcr.io/openbao/openbao:latest
@@ -71,6 +73,8 @@ services:
     cap_add:
       - IPC_LOCK
     restart: always
+    networks:
+      - poa-network
 
   prometheus:
     image: prom/prometheus:v2.54.1
@@ -83,13 +87,15 @@ services:
       - ./infra/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     depends_on:
       - api
+    networks:
+      - poa-network
 
   grafana:
     image: grafana/grafana:11.3.0
     container_name: poa-grafana
     environment:
-      GF_SECURITY_ADMIN_USER: ${GF_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_USER: ${GF_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD}
     ports:
       - "3000:3000"
     volumes:
@@ -98,3 +104,9 @@ services:
       - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
+    networks:
+      - poa-network
+
+networks:
+  poa-network:
+    driver: bridge
