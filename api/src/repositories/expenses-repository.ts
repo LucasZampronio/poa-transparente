@@ -116,7 +116,7 @@ export const ExpensesRepository = {
       LIMIT 10
     `);
     // Map 'amount' to 'total_spent' to maintain compatibility with RankingPanel props in Dashboard.tsx
-    return result.rows.map(row => ({
+    return result.rows.map((row: any) => ({
       ...row,
       total_spent: row.amount
     }));

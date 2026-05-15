@@ -371,7 +371,7 @@ async function getTerritorialBreakdown(category: string) {
     `
   );
 
-  return result.rows.map((row) => ({
+  return result.rows.map((row: any) => ({
     district: row.district,
     contractsCount: toNumber(row.contracts_count),
     totalSpent: toNumber(row.total_spent),
@@ -388,7 +388,7 @@ async function getTopCompanies(category: string) {
     `
   );
 
-  return result.rows.map((row) => ({
+  return result.rows.map((row: any) => ({
     companyName: row.company_name,
     totalReceived: toNumber(row.total_received),
   }));
@@ -407,7 +407,7 @@ async function getMonthlySeries(category: string) {
     [category]
   );
 
-  return result.rows.map((row) => ({
+  return result.rows.map((row: any) => ({
     month: row.month,
     totalSpent: toNumber(row.total_spent),
   }));
@@ -1060,7 +1060,7 @@ export async function buildCategorySuite(category: string) {
     try {
       const records = await getBolsaFamiliaFromDb(202401, PORTO_ALEGRE_BASELINE.ibgeCode);
       if (records.length > 0) {
-        const totalAmount = records.reduce((acc, curr) => acc + Number(curr.valor_transferido), 0);
+        const totalAmount = records.reduce((acc: number, curr: any) => acc + Number(curr.valor_transferido), 0);
         
         for (const group of groups) {
           const indicator = group.indicators.find(ind => ind.id === 'bolsa-familia');
