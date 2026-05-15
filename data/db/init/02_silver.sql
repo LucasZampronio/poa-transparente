@@ -5,7 +5,7 @@
 -- Obras (Dados do TCE-RS)
 CREATE TABLE IF NOT EXISTS silver_obras (
     id SERIAL PRIMARY KEY,
-    external_id INT UNIQUE,
+    external_id INT NOT NULL UNIQUE,
     nome_obra TEXT NOT NULL,
     descricao TEXT,
     valor_licitado NUMERIC(14,2),
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS silver_obras (
 -- Despesas (Dados do Portal da Transparência de POA)
 CREATE TABLE IF NOT EXISTS silver_despesas (
     id SERIAL PRIMARY KEY,
-    num_empenho TEXT,
+    num_empenho TEXT NOT NULL UNIQUE,
     data_empenho DATE,
     valor_empenhado NUMERIC(14,2),
     valor_liquidado NUMERIC(14,2),

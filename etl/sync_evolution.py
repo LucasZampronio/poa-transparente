@@ -129,9 +129,11 @@ def sync_silver_obras():
                   v_total, v_contrato, v_garantia))
 
             total_processed += 1
-            conn.commit()
-            if total_processed % 5 == 0: log_memory()
+            if total_processed % 10 == 0:
+                conn.commit()
+                log_memory()
 
+        conn.commit() # Commit final para o ano
         del works_year
         
     conn.commit()
@@ -172,23 +174,29 @@ def sync_silver_despesas():
             df = pd.read_csv(io.StringIO(content), sep=';')
             
             print(f"   📊 Processando {len(df)} registros para {year}...", flush=True)
-            
+            import hashlib
+
             for _, row in df.iterrows():
-                # Mapeamento baseado na inspeção do CSV
-                # Colunas: ['data_extracao', 'orgao', 'nome_orgao', 'exercicio', 'mes', ..., 'vlemp', 'vlliq', 'vlpag']
-                
                 try:
-                    # Criamos um num_empenho sintético ou usamos um existente se houver (o CSV não parece ter o ID do empenho direto, vamos usar o índice/mes)
                     mes = int(row['mes'])
                     data_empenho = datetime(year, mes, 1)
+                    
+                    # Gerar um ID único baseado nos dados da despesa (Idempotência)
+                    raw_id_content = f"{year}-{mes}-{row.get('orgao', 'N/A')}-{row.get('vlemp', 0)}-{row.get('desc_elemento', 'N/A')}"
+                    unique_id = f"EMP-{hashlib.md5(raw_id_content.encode()).hexdigest()[:12].upper()}"
                     
                     cur.execute("""
                         INSERT INTO silver_despesas (
                             num_empenho, data_empenho, valor_empenhado, valor_liquidado, valor_pago,
                             descricao, cnpj_fornecedor, nome_fornecedor, orgao
                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (num_empenho) DO UPDATE SET
+                            valor_empenhado = EXCLUDED.valor_empenhado,
+                            valor_liquidado = EXCLUDED.valor_liquidado,
+                            valor_pago = EXCLUDED.valor_pago,
+                            descricao = EXCLUDED.descricao
                     """, (
-                        f"EMP-{year}-{mes}-{total_inserted}",
+                        unique_id,
                         data_empenho,
                         float(str(row['vlemp']).replace(',', '.')),
                         float(str(row['vlliq']).replace(',', '.')),

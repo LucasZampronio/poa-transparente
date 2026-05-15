@@ -2,11 +2,24 @@ import unicodedata
 import re
 
 def smart_clean(text):
+    """
+    Limpa o texto removendo caracteres especiais, normalizando espaços
+    e tratando valores nulos. Mantém caracteres latinos (acentos removidos pela normalização NFKD).
+    """
     if text is None or str(text).lower() in ['nan', 'none', '', 'null']: return "N/A"
+    
+    # 1. Converte para string e normaliza para decompor acentos
     text = str(text)
     nfkd_form = unicodedata.normalize('NFKD', text)
+    
+    # 2. Remove caracteres que combinam (acentos)
     text = "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+    
+    # 3. Remove caracteres não-ASCII visíveis, mas mantém espaços e pontuação básica
+    # Regex: substitui qualquer coisa que não seja alfanumérico ASCII, espaço ou pontuação básica
     text = re.sub(r'[^\x20-\x7E]', '', text)
+    
+    # 4. Remove espaços extras e converte para maiúsculas (padrão de banco)
     return text.upper().strip()
 
 def normalize_bairro(bairro_name):
