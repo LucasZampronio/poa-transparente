@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { pool } from '../db.js';
+import { fetchWithTimeout } from '../utils/fetch-with-timeout.js';
 
 const BASE_URL = 'https://api.portaldatransparencia.gov.br/api-de-dados';
 
@@ -15,12 +16,12 @@ export async function portalGet<T>(path: string, params: Record<string, string |
     url.searchParams.set(key, String(value));
   }
 
-  const response = await fetch(url.toString(), {
+  const response = await fetchWithTimeout(url.toString(), {
     headers: {
       'chave-api-dados': apiKey,
       Accept: 'application/json',
     },
-  });
+  }, 15000); // 15s timeout para o portal
 
   if (!response.ok) {
     const text = await response.text();

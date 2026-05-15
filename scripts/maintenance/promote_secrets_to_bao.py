@@ -23,7 +23,8 @@ def promote_secrets():
         "POSTGRES_DB",
         "PORTAL_TRANSPARENCIA_API_KEY",
         "CONECTA_GOV_TOKEN",
-        "GF_ADMIN_PASSWORD"
+        "GF_ADMIN_PASSWORD",
+        "VITE_API_URL"
     ]
 
     data = {}

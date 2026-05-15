@@ -170,9 +170,21 @@ export const ApiService = {
       });
     }
     
-    const response = await fetch(url.toString());
-    if (!response.ok) throw new Error(`Erro ao consultar ${path}`);
-    return response.json() as Promise<T>;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+    
+    try {
+      const response = await fetch(url.toString(), { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!response.ok) throw new Error(`Erro ao consultar ${path}`);
+      return response.json() as Promise<T>;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error(`Timeout ao consultar ${path} (Servidor lento)`);
+      }
+      throw error;
+    }
   },
 
   fetchSectors() {

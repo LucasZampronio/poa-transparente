@@ -20,7 +20,11 @@ FROM nginx:alpine
 # Copia os arquivos estáticos do estágio de build
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copia uma configuração simples de Nginx para suportar roteamento do React (SPA)
+# Copia script de entrada
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Copia uma configuração simples de Nginx
 RUN echo 'server { \
     listen 80; \
     location / { \
@@ -34,4 +38,5 @@ RUN echo 'server { \
 }' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
