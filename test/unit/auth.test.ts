@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import jwt from 'jsonwebtoken';
 import { requireAuth } from '../../api/src/middlewares/auth.js';
 import { Request, Response, NextFunction } from 'express';
 
@@ -6,6 +7,7 @@ describe('Auth Middleware (Unit)', () => {
   let mockRequest: Partial<Request>;
   let mockResponse: Partial<Response>;
   let nextFunction: NextFunction = jest.fn();
+  const JWT_SECRET = 'test-secret';
 
   beforeEach(() => {
     mockRequest = {
@@ -16,12 +18,13 @@ describe('Auth Middleware (Unit)', () => {
       status: jest.fn().mockReturnThis() as any,
       json: jest.fn().mockReturnThis() as any,
     };
+    process.env.JWT_SECRET = JWT_SECRET;
     jest.clearAllMocks();
   });
 
-  it('should call next() if token matches CONECTA_GOV_TOKEN with Bearer prefix', () => {
-    process.env.CONECTA_GOV_TOKEN = 'valid-token';
-    mockRequest.headers = { authorization: 'Bearer valid-token' };
+  it('should call next() if token is valid', () => {
+    const token = jwt.sign({ id: 1 }, JWT_SECRET);
+    mockRequest.headers = { authorization: `Bearer ${token}` };
 
     requireAuth(mockRequest as Request, mockResponse as Response, nextFunction);
 
@@ -43,12 +46,22 @@ describe('Auth Middleware (Unit)', () => {
   });
 
   it('should return 403 if token is invalid', () => {
-    process.env.CONECTA_GOV_TOKEN = 'secret-token';
     mockRequest.headers = { authorization: 'Bearer wrong-token' };
 
     requireAuth(mockRequest as Request, mockResponse as Response, nextFunction);
 
     expect(mockResponse.status).toHaveBeenCalledWith(403);
     expect(mockResponse.json).toHaveBeenCalledWith({ error: 'Token inválido ou expirado' });
+  });
+
+  it('should return 500 if JWT_SECRET is not configured', () => {
+    delete process.env.JWT_SECRET;
+    const token = jwt.sign({ id: 1 }, JWT_SECRET);
+    mockRequest.headers = { authorization: `Bearer ${token}` };
+
+    requireAuth(mockRequest as Request, mockResponse as Response, nextFunction);
+
+    expect(mockResponse.status).toHaveBeenCalledWith(500);
+    expect(mockResponse.json).toHaveBeenCalledWith({ error: 'Erro interno de configuração de segurança' });
   });
 });
