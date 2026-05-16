@@ -110,7 +110,7 @@ jobs:
             # Exporta variáveis para o Docker Compose
             export PORTAL_TRANSPARENCIA_API_KEY="${{ secrets.PORTAL_TRANSPARENCIA_API_KEY }}"
             export CONECTA_GOV_TOKEN="${{ secrets.CONECTA_GOV_TOKEN }}"
-            export VITE_API_URL="http://$PUBLIC_IP:4000"
+            export VITE_API_URL="http://$PUBLIC_IP"
             
             # Tenta abrir o firewall interno (Oracle Linux / Ubuntu)
             sudo firewall-cmd --permanent --add-port=5173/tcp &>/dev/null && sudo firewall-cmd --permanent --add-port=4000/tcp &>/dev/null && sudo firewall-cmd --reload &>/dev/null || true

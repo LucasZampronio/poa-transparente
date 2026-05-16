@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export type Summary = {
   total_spent: string;
@@ -159,7 +159,9 @@ export function formatLabel(text: string) {
 
 export const ApiService = {
   async fetchJson<T>(path: string, params?: Record<string, string | string[]>): Promise<T> {
-    const url = new URL(`${API_URL}${path}`);
+    const baseUrl = API_URL.startsWith('http') ? API_URL : window.location.origin;
+    const url = new URL(path.startsWith('/') ? path : `/${path}`, baseUrl);
+
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (Array.isArray(value)) {
