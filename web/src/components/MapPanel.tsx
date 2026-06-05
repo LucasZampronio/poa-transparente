@@ -64,18 +64,37 @@ export default function MapPanel({ points, viewMode, loading, selectedSector, fo
     map.current = new maplibregl.Map({
       container: mapContainer.current,
       style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-      center: [-51.21, -30.10],
-      zoom: 11,
-      attributionControl: false
+      center: [-51.21, -30.04],
+      zoom: 12,
+      attributionControl: false,
+      maxBounds: [[-51.5, -30.4], [-50.9, -29.8]] // Restrição de navegação em POA
     });
 
     map.current.on('load', () => {
       setMapReady(true);
       
+      const v = new Date().getTime(); // Cache buster
+
+      // 0. Máscara de Recorte (Clip fora de POA)
+      map.current!.addSource('poa-mask-source', {
+        type: 'geojson',
+        data: `/data/poa_mask.geojson?v=${v}`
+      });
+
+      map.current!.addLayer({
+        id: 'poa-mask-layer',
+        type: 'fill',
+        source: 'poa-mask-source',
+        paint: {
+          'fill-color': '#000000',
+          'fill-opacity': 0.6
+        }
+      });
+
       // 1. Contorno Real de Porto Alegre
       map.current!.addSource('poa-outline-source', {
         type: 'geojson',
-        data: '/data/poa_boundary.geojson'
+        data: `/data/poa_boundary.geojson?v=${v}`
       });
 
       map.current!.addLayer({
@@ -83,16 +102,16 @@ export default function MapPanel({ points, viewMode, loading, selectedSector, fo
         type: 'line',
         source: 'poa-outline-source',
         paint: {
-          'line-color': '#ffffff',
-          'line-width': 2,
-          'line-opacity': 0.8
+          'line-color': '#3b82f6',
+          'line-width': 3,
+          'line-opacity': 0.9
         }
       });
 
-      // 2. Mosaico de Bairros (Grid)
+      // 2. Mosaico de Bairros Reais
       map.current!.addSource('bairros-source', {
         type: 'geojson',
-        data: '/data/bairros_poa.geojson'
+        data: `/data/bairros_poa.geojson?v=${v}`
       });
 
       map.current!.addLayer({
@@ -277,19 +296,19 @@ export default function MapPanel({ points, viewMode, loading, selectedSector, fo
         const el = document.createElement('div');
         el.className = 'marker-wrapper';
         const visual = document.createElement('div');
-        visual.style.width = isObra ? '32px' : '26px';
-        visual.style.height = isObra ? '32px' : '26px';
+        visual.style.width = isObra ? '32px' : '24px';
+        visual.style.height = isObra ? '32px' : '24px';
         visual.style.backgroundColor = color;
-        visual.style.borderRadius = isObra ? '12px' : '8px';
-        visual.style.border = isObra ? '3px solid white' : '2px solid rgba(255,255,255,0.6)';
-        visual.style.boxShadow = `0 0 20px ${color}55`;
+        visual.style.borderRadius = isObra ? '12px' : '50%';
+        visual.style.border = isObra ? '3px solid white' : '2px solid white';
+        visual.style.boxShadow = `0 0 15px ${color}88`;
         visual.style.display = 'flex';
         visual.style.alignItems = 'center';
         visual.style.justifyContent = 'center';
         visual.style.cursor = 'pointer';
         visual.style.color = 'white';
         visual.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-        visual.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${isObra ? 20 : 16}" height="${isObra ? 20 : 16}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none;">${iconPath}</svg>`;
+        visual.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${isObra ? 20 : 14}" height="${isObra ? 20 : 14}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none;">${iconPath}</svg>`;
         el.appendChild(visual);
 
         const marker = new maplibregl.Marker({ element: el })
@@ -310,24 +329,34 @@ export default function MapPanel({ points, viewMode, loading, selectedSector, fo
         });
 
         markers.current.push(marker);
-      });
+        });
 
-      if (validPoints.length > 0) {
+        if (validPoints.length > 0) {
         const bounds = new maplibregl.LngLatBounds();
         validPoints.forEach(p => bounds.extend([Number(p.longitude), Number(p.latitude)]));
         map.current.fitBounds(bounds, { padding: 50, maxZoom: 15, duration: 1000 });
-      }
-    }
-  }, [mapReady, points, selectedSector, viewMode, onPointClick]);
+        }
+        }
+        }, [mapReady, points, selectedSector, viewMode, onPointClick]);
 
-  return (
-    <div className="absolute inset-0 z-0 bg-[#0a0b0d]">
-      <div ref={mapContainer} className="h-full w-full" />
-      {loading && (
+        return (
+        <div className="absolute inset-0 z-0 bg-[#0a0b0d]">
+        <div ref={mapContainer} className="h-full w-full" />
+        <style>{`
+        .custom-popup .maplibregl-popup-content {
+          background: #0f1115 !important;
+          border: 1px solid rgba(255,255,255,0.1) !important;
+          border-radius: 20px !important;
+          padding: 16px !important;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.8) !important;
+          backdrop-filter: blur(10px) !important;
+        }
+        `}</style>
+        {loading && (
         <div className="absolute inset-0 z-50 bg-black/40 backdrop-blur-md flex items-center justify-center">
           <div className="w-12 h-12 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
-      )}
-    </div>
-  );
-}
+        )}
+        </div>
+        );
+        }
