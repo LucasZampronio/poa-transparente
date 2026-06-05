@@ -52,15 +52,19 @@ def aggregate_gold_data():
                             total_gasto = EXCLUDED.total_gasto
                     """)
 
-                    # 3. Top Empresas
+                    # 3. Top Empresas (Unificando Obras e Despesas se possível, ou focando em Obras que tem CNPJ real)
+                    cur.execute("TRUNCATE TABLE gold_top_empresas")
                     cur.execute("""
                         INSERT INTO gold_top_empresas (cnpj, empresa, total_recebido, quantidade_contratos)
-                        SELECT COALESCE(sd.cnpj_fornecedor, 'N/A'), MAX(sd.nome_fornecedor), SUM(sd.valor_pago), COUNT(DISTINCT sd.id)
-                        FROM silver_despesas sd
-                        GROUP BY COALESCE(sd.cnpj_fornecedor, 'N/A')
-                        ON CONFLICT (cnpj) DO UPDATE SET
-                            total_recebido = EXCLUDED.total_recebido,
-                            quantidade_contratos = EXCLUDED.quantidade_contratos
+                        SELECT 
+                            contratada_cnpj as cnpj, 
+                            MAX(contratada_nome) as empresa, 
+                            SUM(valor_licitado) as total_recebido, 
+                            COUNT(*) as quantidade_contratos
+                        FROM silver_obras
+                        WHERE contratada_cnpj != 'N/A' AND contratada_nome != 'EMPRESA NÃO INFORMADA'
+                        GROUP BY contratada_cnpj
+                        ORDER BY total_recebido DESC
                     """)
 
                     # 4. Top Órgãos

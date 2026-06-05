@@ -18,15 +18,15 @@ COPY package*.json ./
 # Instala apenas dependências de produção
 RUN npm install --omit=dev
 
-# Instala curl para buscar segredos do OpenBao
-RUN apk add --no-cache curl
+# Instala curl e dos2unix
+RUN apk add --no-cache curl dos2unix
 
 # Copia os arquivos compilados do estágio de build
 COPY --from=builder /app/dist ./dist
 
-# Copia o script de entrypoint
+# Copia o script de entrypoint e corrige line endings
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
 
 # A API não deve depender de um arquivo .env físico em produção.
 ENV NODE_ENV=production

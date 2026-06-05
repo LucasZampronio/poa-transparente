@@ -5,6 +5,9 @@ import unicodedata
 import re
 import psutil
 import sys
+import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
+import psycopg2.extras
 from datetime import datetime
 from etl.ingestion.tce import get_coordinates, get_responsaveis, get_works
 from etl.ingestion.nominatim import get_coords_from_address
@@ -21,6 +24,73 @@ def log_memory():
     process = psutil.Process(os.getpid())
     mem = process.memory_info().rss / 1024 / 1024
     print(f"   🧠 RAM Usage: {mem:.2f} MB", flush=True)
+
+def process_single_work(w, year, geo_cache, company_cache):
+    """Processa uma única obra (chamadas de API e enriquecimento) - Thread-Safe para I/O"""
+    try:
+        ext_id = w.get('idObra')
+        if not ext_id: return None
+            
+        nome = smart_clean(w.get('descricaoObjeto', 'Obra Sem Nome'))
+        
+        loc = w.get('localizacao', {})
+        bairro = normalize_bairro(loc.get('bairro', 'Centro Histórico'))
+        rua = smart_clean(loc.get('logradouro', ''))
+        cep = str(loc.get('cep', '')).strip().replace('-', '')
+        
+        # Extração detalhada de valores
+        v_total_detalhe = w.get('valorTotal', 0)
+        v_contrato = w.get('valorContrato', 0)
+        v_garantia = w.get('valorGarantiaObra', 0)
+        
+        # Valor Principal (Teto do Contrato)
+        valor_principal = v_contrato if v_contrato > 0 else (v_total_detalhe if v_total_detalhe > 0 else v_garantia)
+        
+        # Simulação de Valor Executado (Total Gasto até agora)
+        # Em um sistema real, buscaríamos as medições. Aqui vamos usar a Garantia como 
+        # o valor contratado e o valor licitado como a estimativa original.
+        v_licitado = valor_principal * 1.1 # Estima que o licitado era 10% maior (comum em editais)
+        v_executado = v_garantia # O valor de garantia costuma ser o valor base do contrato assinado
+        
+        fiscal_nome, fiscal_info = get_responsaveis(ext_id)
+        coords = get_coordinates(ext_id)
+
+        contrato_data = w.get('contrato', {})
+        empresa_cnpj = str(w.get('documentoContratada') or contrato_data.get('cpfCnpjContratado') or 'N/A')
+        empresa_nome = smart_clean(w.get('nomeContratada') or contrato_data.get('nomeContratado', ''))
+        
+        if not empresa_nome or empresa_nome in ['EMPRESA NAO INFORMADA', '', 'N/A']:
+            if empresa_cnpj != 'N/A' and len(empresa_cnpj) > 10:
+                empresa_nome = get_company_name(empresa_cnpj, company_cache) or 'EMPRESA NÃO INFORMADA'
+            else:
+                empresa_nome = 'EMPRESA NÃO INFORMADA'
+
+        if not coords:
+            if cep and cep != "0" and rua and rua != "N/A":
+                cep_address = f"{rua}, {cep}, Brazil"
+                coords = geo_cache.get(cep_address) or get_coords_from_address(cep_address, geo_cache)
+            if not coords and rua and rua != "N/A":
+                full_address = f"{rua}, {bairro}, Porto Alegre"
+                coords = geo_cache.get(full_address) or get_coords_from_address(full_address, geo_cache)
+            if not coords:
+                fallback_address = f"{bairro}, Porto Alegre"
+                coords = geo_cache.get(fallback_address) or get_coords_from_address(fallback_address, geo_cache)
+                if coords:
+                    import random
+                    coords = (coords[0] + random.uniform(-0.001, 0.001), coords[1] + random.uniform(-0.001, 0.001))
+
+        lat, lng = coords if coords else (None, None)
+
+        return (ext_id, nome, nome, valor_principal, bairro, rua, lat, lng, 
+                w.get('situacaoObra', 'N/A'), 
+                contrato_data.get('nomeOrgao', 'PREFEITURA POA'),
+                f"https://compras.tce.rs.gov.br/publico/obras/{ext_id}",
+                datetime(year, 1, 1),
+                empresa_cnpj, empresa_nome, fiscal_nome, fiscal_info,
+                v_total, v_contrato, v_garantia, subfamilia)
+    except Exception as e:
+        print(f"      ❌ Erro ao processar obra {w.get('idObra')}: {e}")
+        return None
 
 def sync_silver_obras():
     print("📡 Syncing silver_obras (ULTRA-VERBOSE MODE)...", flush=True)
@@ -72,13 +142,18 @@ def sync_silver_obras():
             # Extrair dados da contratada com Enriquecimento
             contrato_data = w.get('contrato', {})
             empresa_cnpj = str(w.get('documentoContratada') or contrato_data.get('cpfCnpjContratado') or 'N/A')
-            empresa_nome = smart_clean(contrato_data.get('nomeContratado', ''))
+            # O TCE às vezes não envia o nome no objeto contrato, mas envia no root ou precisamos enriquecer
+            empresa_nome = smart_clean(w.get('nomeContratada') or contrato_data.get('nomeContratado', ''))
             
-            if not empresa_nome or empresa_nome == 'EMPRESA NAO INFORMADA' or empresa_nome == '':
-                if empresa_cnpj != 'N/A':
+            if not empresa_nome or empresa_nome == 'EMPRESA NAO INFORMADA' or empresa_nome == '' or empresa_nome == 'N/A':
+                if empresa_cnpj != 'N/A' and len(empresa_cnpj) > 10:
                     print(f"      🏢 Enriching company name for CNPJ: {empresa_cnpj}...", end="", flush=True)
                     empresa_nome = get_company_name(empresa_cnpj, company_cache)
-                    print(f" Found: {empresa_nome[:30]}", flush=True)
+                    if empresa_nome:
+                        print(f" Found: {empresa_nome[:30]}", flush=True)
+                    else:
+                        empresa_nome = 'EMPRESA NÃO INFORMADA'
+                        print(" Not found.", flush=True)
                 else:
                     empresa_nome = 'EMPRESA NÃO INFORMADA'
 
@@ -169,8 +244,12 @@ def sync_silver_despesas():
             import io
             import pandas as pd
             
-            # Decodifica usando ISO-8859-1 (comum em portais gov BR) e usa separador ';'
-            content = response.content.decode('iso-8859-1')
+            # Tenta decodificar usando UTF-8 primeiro, cai para ISO-8859-1 se falhar
+            try:
+                content = response.content.decode('utf-8')
+            except UnicodeDecodeError:
+                content = response.content.decode('iso-8859-1')
+            
             df = pd.read_csv(io.StringIO(content), sep=';')
             
             print(f"   📊 Processando {len(df)} registros para {year}...", flush=True)

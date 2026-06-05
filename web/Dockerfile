@@ -17,12 +17,15 @@ RUN npm run build
 # Production stage (servindo com Nginx)
 FROM nginx:alpine
 
+# Instala dos2unix
+RUN apk add --no-cache dos2unix
+
 # Copia os arquivos estáticos do estágio de build
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copia script de entrada
+# Copia script de entrada e corrige line endings
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Copia uma configuração simples de Nginx
 RUN echo 'server { \

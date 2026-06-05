@@ -72,13 +72,17 @@ export function useDashboardData() {
     const topExpensesList = safeTopExpenses
       .filter(e => e && e.description)
       .map(e => ({
+        ...e,
         description: e.description,
         total_spent: e.amount || 0,
         company_name: e.company_name || 'N/A',
         agency: e.agency || 'N/A',
         type: e.type,
         latitude: e.latitude,
-        longitude: e.longitude
+        longitude: e.longitude,
+        process_number: e.process_number,
+        reference_date: e.reference_date,
+        description_detailed: e.description_detailed || e.description
       }));
 
     // Calcula Lista de Setores baseada nos pontos TOTAIS do ano selecionado
@@ -108,7 +112,7 @@ export function useDashboardData() {
       topExpenses: topExpensesList,
       sectorList
     };
-  }, [allMapPoints, globalTopExpenses, selectedYear, selectedSector]);
+  }, [allMapPoints, globalTopExpenses, globalSummary, selectedYear, selectedSector]);
 
   return {
     allMapPoints,

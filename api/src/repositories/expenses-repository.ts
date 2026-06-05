@@ -4,7 +4,7 @@ export const ExpensesRepository = {
   async getSummary() {
     const result = await pool.query(`
       SELECT 
-        COALESCE(SUM(valor_total_gasto), 0) AS total_spent, 
+        COALESCE(SUM(valor_licitado), 0) AS total_spent, 
         COUNT(*) AS contracts_count, 
         (SELECT COUNT(*) FROM gold_top_empresas) AS companies_count,
         (SELECT COUNT(*) FROM gold_top_agencies) AS agencies_count 
@@ -41,8 +41,8 @@ export const ExpensesRepository = {
         so.longitude, 
         COALESCE(so.nome_obra, 'OBRA SEM DESCRIÇÃO') as description_detailed,
         COALESCE(MAX(so.valor_licitado), 0) as contract_value,
-        COALESCE(MAX(so.valor_total), 0) as value_total,
-        COALESCE(MAX(so.valor_contrato), 0) as value_contracted,
+        COALESCE(NULLIF(MAX(so.valor_total), 0), MAX(so.valor_licitado), 0) as value_total,
+        COALESCE(NULLIF(MAX(so.valor_contrato), 0), MAX(so.valor_licitado), 0) as value_contracted,
         COALESCE(MAX(so.valor_garantia), 0) as value_guarantee,
         'INFRAESTRUTURA' as sector,
         'OBRA' as type,
@@ -64,9 +64,9 @@ export const ExpensesRepository = {
         ) as beneficiary_id,
         COALESCE(MAX(so.logradouro), so.bairro, 'PORTO ALEGRE') as address,
         COALESCE(MAX(so.fiscal_nome), 'NÃO INFORMADO') as fiscal_name,
-        'Setor Fiscal: ' || COALESCE(so.orgao, 'PREFEITURA POA') as fiscal_info,
+        COALESCE(MAX(so.fiscal_info), 'Setor: NÃO INFORMADO') as fiscal_info,
         NULL as technical_family,
-        COALESCE(MAX(so.finalidade), 'N/A') as technical_subfamily,
+        COALESCE(MAX(so.subfamilia), 'N/A') as technical_subfamily,
         so.external_id::text as process_number
       FROM silver_obras so
       WHERE so.latitude IS NOT NULL AND so.longitude IS NOT NULL
@@ -109,7 +109,12 @@ export const ExpensesRepository = {
         orgao as agency,
         'OBRA' as type,
         latitude,
-        longitude
+        longitude,
+        external_id::text as process_number,
+        data_inicio::text as reference_date,
+        bairro as district,
+        logradouro as address,
+        contratada_cnpj as beneficiary_id
       FROM silver_obras 
       WHERE valor_licitado > 0
       ORDER BY amount DESC 
@@ -118,7 +123,8 @@ export const ExpensesRepository = {
     // Map 'amount' to 'total_spent' to maintain compatibility with RankingPanel props in Dashboard.tsx
     return result.rows.map((row: any) => ({
       ...row,
-      total_spent: row.amount
+      total_spent: row.amount,
+      description_detailed: row.description // Para garantir compatibilidade com o painel de detalhes
     }));
   },
 

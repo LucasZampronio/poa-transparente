@@ -6,15 +6,15 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Instala curl para buscar segredos do OpenBao
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Instala curl e dos2unix
+RUN apt-get update && apt-get install -y curl dos2unix && rm -rf /var/lib/apt/lists/*
 
 # Copia a pasta etl inteira para manter a estrutura de pacotes
 COPY . ./etl/
 
-# Copia o script de entrypoint
+# Copia o script de entrypoint e corrige line endings
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Define o PYTHONPATH para a raiz onde a pasta etl reside
 ENV PYTHONPATH=/app
