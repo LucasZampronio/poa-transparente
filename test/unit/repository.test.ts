@@ -65,7 +65,7 @@ describe('ExpensesRepository (Unit)', () => {
     const result = await ExpensesRepository.getTopExpenses();
 
     expect(result).toEqual([
-      { description: 'OBRA 1', amount: 500, total_spent: 500 }
+      { description: 'OBRA 1', amount: 500, total_spent: 500, description_detailed: 'OBRA 1' }
     ]);
   });
 
